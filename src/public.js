@@ -60,10 +60,11 @@ function route(){
   if(hash === "#/recursos"){ show("featuresView"); return; }
   if(hash.startsWith("#/cardapio")){
     const key = decodeURIComponent(hash.split("/")[2] || "demo");
+    const keyNorm = normalize(key);
     if(key === "demo"){
       state.activeStore = demoStore();
     }else{
-      state.activeStore = state.stores.find(s => s.id === key || s.slug === key || slug(s) === key) || null;
+      state.activeStore = state.stores.find(s => s.id === key || normalize(s.slug || "") === keyNorm || slug(s) === keyNorm) || null;
     }
     show("menuView");
     renderMenu();
@@ -210,12 +211,14 @@ function bind(){
   window.addEventListener("hashchange", route);
 }
 function subscribe(){
-  onSnapshot(collection(db,"stores"), snap => { state.stores=snap.docs.map(d=>({id:d.id,...d.data()})); state.storesLoaded=true; route(); });
-  onSnapshot(collection(db,"categories"), snap => { state.categories=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); });
-  onSnapshot(collection(db,"products"), snap => { state.products=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); });
+  onSnapshot(collection(db,"stores"), snap => { state.stores=snap.docs.map(d=>({id:d.id,...d.data()})); state.storesLoaded=true; route(); }, err => { state.storesLoaded=true; toast("Erro ao carregar lojas: " + err.message, "err"); route(); });
+  onSnapshot(collection(db,"categories"), snap => { state.categories=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); }, err => toast("Erro ao carregar categorias: " + err.message, "err"));
+  onSnapshot(collection(db,"products"), snap => { state.products=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); }, err => toast("Erro ao carregar produtos: " + err.message, "err"));
 }
 bind();
 subscribe();
+// public-store-timeout-fix
+setTimeout(() => { if(!state.storesLoaded && location.hash.startsWith("#/cardapio")) { state.storesLoaded = true; route(); toast("A loja demorou para carregar. Confira regras do Firestore ou recarregue.", "err"); } }, 8000);
 route();
 renderCart();
 
