@@ -1,12 +1,21 @@
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, updateProfile, updateEmail, updatePassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+const OWNER_EMAIL = "davicostadua480@gmail.com";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+const BOOT_ADMIN_EMAIL = "admin@menuforge.local";
+const BOOT_ADMIN_PASSWORD = "admin123";
+
+function loginIdentifierToEmail(value) {
+  const raw = String(value || "").trim();
+  return raw.toLowerCase() === "admin" ? BOOT_ADMIN_EMAIL : raw;
+}
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -15,6 +24,7 @@ const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" 
 const state = {
   user: null,
   profile: null,
+  users: [],
   stores: [],
   categories: [],
   products: [],
@@ -42,17 +52,31 @@ function normalize(v = "") { return String(v).toLowerCase().normalize("NFD").rep
 function esc(v = "") { return String(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c])); }
 function toNumber(v) { const n = Number(String(v || "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0; }
 function stamp(v) { return v?.toMillis ? v.toMillis() : v?.seconds ? v.seconds * 1000 : Date.parse(v) || 0; }
-function toast(msg, type = "") { const el = document.createElement("div"); el.className = "toast " + type; el.textContent = msg; $("#toastArea").append(el); setTimeout(() => el.remove(), 4500); }
+function toast(msg, type = "") { const el = document.createElement("div"); el.className = "toast " + type; el.textContent = msg; $("#toastArea").append(el); setTimeout(() => el.remove(), 5200); }
 function saveCart() { localStorage.setItem("mf-cart", JSON.stringify(state.cart)); }
 function role() { return state.profile?.role || "visitor"; }
-function isDev() { return ["developer", "admin"].includes(role()); }
-function isMerchant() { return ["merchant", "developer", "admin"].includes(role()); }
-function currentStoreId() { return state.activeStoreId || state.profile?.currentStoreId || state.stores[0]?.id || null; }
+function approved() { return state.profile?.status === "approved" || role() === "customer" || isOwner() || isDev(); }
+function isOwner() { return state.user?.email === OWNER_EMAIL; }
+function isDev() { return isOwner() || ["developer", "admin"].includes(role()); }
+function isMerchant() { return ["merchant", "developer", "admin"].includes(role()) && approved(); }
+function currentStoreId() { return state.activeStoreId || state.profile?.currentStoreId || state.stores.find(s => s.ownerId === state.user?.uid)?.id || state.stores[0]?.id || null; }
 function slug(store) { return normalize(store?.slug || store?.name || "loja").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function address(order) { const a = order.address || {}; return [a.street, a.number, a.district, a.complement, a.reference].filter(Boolean).join(", "); }
 function mapsUrl(order) { return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(address(order)); }
 function wazeUrl(order) { return "https://waze.com/ul?q=" + encodeURIComponent(address(order)) + "&navigate=yes"; }
 function wa(phone, msg) { const p = String(phone || "").replace(/\D/g, ""); return "https://wa.me/" + p + "?text=" + encodeURIComponent(msg); }
+
+function applyUiSettings() {
+  const settings = JSON.parse(localStorage.getItem("mf-ui") || "{}");
+  document.body.classList.toggle("light", settings.mode === "light");
+  ["warm", "forest", "royal"].forEach(c => document.body.classList.remove(c));
+  if (settings.palette && settings.palette !== "default") document.body.classList.add(settings.palette);
+  document.body.classList.toggle("compact", settings.density === "compact");
+}
+function saveUiSettings(settings) {
+  localStorage.setItem("mf-ui", JSON.stringify(settings));
+  applyUiSettings();
+}
 
 function demoStore() {
   return { id: "demo", name: "Demo Burger", slug: "demo", status: "open", whatsapp: "5549999999999", deliveryFee: 6.5, minOrder: 15, headline: "Smash burgers, combos e bebidas em uma experiência de cardápio limpa." };
@@ -67,7 +91,6 @@ function demoProducts() {
     { id: "p3", storeId: "demo", categoryId: "drinks", name: "Refrigerante lata", price: 6.5, active: true, prepTime: 2, description: "Escolha o sabor nas observações.", emoji: "🥤" }
   ];
 }
-
 function storeCategories(storeId) {
   const list = state.categories.filter(c => c.storeId === storeId);
   return list.length ? list : storeId === "demo" ? demoCategories() : [];
@@ -86,15 +109,23 @@ function showPublic(id) {
   hideAllPublic();
   $("#" + id).classList.remove("hidden");
 }
+function openSidebar() {
+  $("#adminSidebar").classList.add("open");
+  $("#sidebarBackdrop").classList.remove("hidden");
+}
+function closeSidebar() {
+  $("#adminSidebar").classList.remove("open");
+  $("#sidebarBackdrop").classList.add("hidden");
+}
 function showAdmin(view = state.activeView) {
   $("#publicArea").classList.add("hidden");
   $("#adminApp").classList.remove("hidden");
   $$(".workspace").forEach(w => w.classList.add("hidden"));
   $("#" + view).classList.remove("hidden");
   state.activeView = view;
-  $("#workspaceTitle").textContent = ({ dashboardView: "Centro de operação", ordersView: "Pedidos", menuAdminView: "Cardápio", courierView: "Entregador", settingsView: "Configurações", developerView: "Developer Studio" })[view] || "Painel";
-  $("#workspaceLabel").textContent = role() === "courier" ? "Entregas" : isDev() ? "Developer" : "Estabelecimento";
-  $("#adminSidebar").classList.remove("open");
+  $("#workspaceTitle").textContent = ({ dashboardView: "Centro de operação", ordersView: "Pedidos", menuAdminView: "Cardápio", courierView: "Entregador", settingsView: "Configurações", approvalsView: "Aprovações", developerView: "CMS Admin" })[view] || "Painel";
+  $("#workspaceLabel").textContent = isDev() ? "Admin" : role() === "courier" ? "Entregas" : "Estabelecimento";
+  closeSidebar();
   renderAdminNav();
   renderActiveWorkspace();
 }
@@ -118,12 +149,29 @@ function route() {
   showPublic("landingPage");
 }
 
-async function ensureProfile(user, initialRole = "merchant") {
+async function ensureProfile(user, requestedRole = "merchant") {
   const ref = doc(db, "users", user.uid);
-  const base = { uid: user.uid, email: user.email, name: user.displayName || user.email?.split("@")[0] || "Usuário", role: initialRole };
+  const owner = user.email === OWNER_EMAIL;
+  const base = {
+    uid: user.uid,
+    email: user.email,
+    name: user.displayName || user.email?.split("@")[0] || "Usuário",
+    role: owner ? "developer" : requestedRole === "customer" ? "customer" : "pending",
+    requestedRole,
+    status: owner || requestedRole === "customer" ? "approved" : "pending"
+  };
+
   try {
     const snap = await getDoc(ref);
-    if (snap.exists()) return { ...base, ...snap.data() };
+    if (snap.exists()) {
+      const data = { ...base, ...snap.data() };
+      if (owner && (data.role !== "developer" || data.status !== "approved")) {
+        await setDoc(ref, { role: "developer", status: "approved", requestedRole: "developer", updatedAt: serverTimestamp() }, { merge: true });
+        return { ...data, role: "developer", status: "approved", requestedRole: "developer" };
+      }
+      return data;
+    }
+
     await setDoc(ref, { ...base, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     return base;
   } catch (err) {
@@ -144,17 +192,18 @@ function subscribe() {
       renderAll();
     }, err => toast(name + ": " + err.message, "err")));
   };
+
+  listen("users", data => state.users = data.sort((a, b) => (a.email || "").localeCompare(b.email || "")));
   listen("stores", data => {
     state.stores = data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     const id = currentStoreId();
-    state.activeStore = state.stores.find(s => s.id === id) || state.activeStore || state.stores[0] || null;
+    state.activeStore = state.stores.find(s => s.id === id) || state.activeStore || state.stores.find(s => s.ownerId === state.user?.uid) || null;
     state.activeStoreId = state.activeStore?.id || null;
   });
   listen("categories", data => state.categories = data);
   listen("products", data => state.products = data.sort((a, b) => (a.name || "").localeCompare(b.name || "")));
   listen("orders", data => state.orders = data.sort((a, b) => stamp(b.createdAt) - stamp(a.createdAt)));
 }
-
 function renderAll() {
   renderMenuPage();
   if (!$("#adminApp").classList.contains("hidden")) renderActiveWorkspace();
@@ -209,7 +258,6 @@ function changeQty(id, delta) {
   saveCart();
   renderCart();
 }
-
 async function submitOrder(form) {
   if (!state.cart.length) return toast("Carrinho vazio.", "err");
   const fd = new FormData(form);
@@ -246,13 +294,18 @@ async function submitOrder(form) {
 
 function renderAdminNav() {
   const items = [];
+
   if (isMerchant()) items.push(["dashboardView", "Centro"], ["ordersView", "Pedidos"], ["menuAdminView", "Cardápio"], ["settingsView", "Configurações"]);
-  if (role() === "courier" || isDev()) items.push(["courierView", "Entregador"]);
-  if (isDev()) items.push(["developerView", "Developer"]);
+  if (role() === "courier" && approved()) items.push(["courierView", "Entregador"]);
+  if (isDev()) items.push(["approvalsView", "Aprovações"], ["dashboardView", "Centro"], ["ordersView", "Pedidos"], ["menuAdminView", "Cardápio"], ["courierView", "Entregador"], ["settingsView", "Configurações"], ["developerView", "CMS Admin"]);
+
+  if (!items.length) items.push(["dashboardView", "Status da conta"], ["settingsView", "Configurações"]);
+
   $("#adminNav").innerHTML = items.map(([id, label]) => `<button class="nav-btn ${state.activeView === id ? "active" : ""}" data-view="${id}" type="button">${label}</button>`).join("");
   $$("#adminNav [data-view]").forEach(btn => btn.onclick = () => showAdmin(btn.dataset.view));
-  $("#roleLabel").textContent = role();
+  $("#roleLabel").textContent = isDev() ? "developer" : role() === "pending" ? "pendente" : role();
 }
+
 function storeOrders() {
   const id = currentStoreId();
   return isDev() ? state.orders : state.orders.filter(o => o.storeId === id || o.customer?.uid === state.user?.uid || o.assignedCourierId === state.user?.uid);
@@ -264,17 +317,23 @@ function renderActiveWorkspace() {
   if (view === "menuAdminView") return renderMenuAdmin();
   if (view === "courierView") return renderCourier();
   if (view === "settingsView") return renderSettings();
+  if (view === "approvalsView") return renderApprovals();
   if (view === "developerView") return renderDeveloper();
 }
 
+function pendingHtml() {
+  return `<div class="panel"><div class="badges"><span class="badge warn">Conta aguardando aprovação</span></div><h2>Seu acesso ainda não foi aprovado</h2><p style="color:var(--muted);line-height:1.7">Sua conta foi criada como <b>${esc(state.profile?.requestedRole || "estabelecimento")}</b>. Um admin precisa aprovar para liberar o painel operacional. Enquanto isso, você pode ajustar o visual em Configurações.</p></div>`;
+}
 function requireStoreHtml() {
+  if (!approved()) return pendingHtml();
   if (state.activeStore) return "";
-  return `<div class="panel"><h2>Configure sua loja</h2><p style="color:var(--muted)">Você já está logado. Agora crie uma loja demo para começar a cadastrar produtos e receber pedidos.</p><button class="btn primary" id="emptySeed" type="button">Criar loja demo</button></div>`;
+  return `<div class="panel"><h2>Crie sua primeira loja</h2><p style="color:var(--muted);line-height:1.7">Não existe loja vinculada a esta conta. Crie uma loja inicial para começar a cadastrar produtos e receber pedidos.</p><button class="btn primary" id="emptySeed" type="button">Criar loja inicial</button></div>`;
 }
 function renderDashboard() {
-  if (!state.activeStore) {
+  if (!approved() || !state.activeStore) {
     $("#dashboardView").innerHTML = requireStoreHtml();
-    $("#emptySeed").onclick = createDemoStore;
+    const seed = $("#emptySeed");
+    if (seed) seed.onclick = createInitialStore;
     return;
   }
   const orders = storeOrders();
@@ -284,9 +343,10 @@ function renderDashboard() {
   wireOrderButtons();
 }
 function orderCard(o) {
-  return `<article class="order-card"><h4>#${esc(o.shortId || o.id.slice(0, 6))} · ${esc(o.customer?.name || "Cliente")}</h4><div class="badges"><span class="badge warn">${statusName[o.status] || o.status}</span><span class="badge">${money(o.total)}</span></div><p>${esc(address(o))}</p><div class="order-actions">${flow.map(([s, l]) => `<button class="btn ghost" data-status="${o.id}:${s}" type="button">${l}</button>`).join("")}<a class="btn soft" href="${mapsUrl(o)}" target="_blank">GPS</a></div></article>`;
+  return `<article class="order-card"><h4>#${esc(o.shortId || o.id.slice(0, 6))} · ${esc(o.customer?.name || "Cliente")}</h4><div class="badges"><span class="badge warn">${statusName[o.status] || o.status}</span><span class="badge">${money(o.total)}</span></div><p>${esc(address(o))}</p><div class="order-actions">${flow.map(([s, l]) => `<button class="btn ghost" data-status="${o.id}:${s}" type="button">${l}</button>`).join("")}<a class="btn soft" href="${mapsUrl(o)}" target="_blank">GPS</a><a class="btn ghost" href="${wazeUrl(o)}" target="_blank">Waze</a></div></article>`;
 }
 function renderOrders() {
+  if (!approved()) { $("#ordersView").innerHTML = pendingHtml(); return; }
   const orders = storeOrders();
   $("#ordersView").innerHTML = `<div class="kanban">${flow.map(([s, label]) => `<section class="kanban-col"><h3>${label}</h3>${orders.filter(o => o.status === s).map(orderCard).join("") || "<div class='empty'>Vazio</div>"}</section>`).join("")}</div>`;
   wireOrderButtons();
@@ -298,12 +358,12 @@ function wireOrderButtons() {
     catch (err) { toast(err.message, "err"); }
   });
 }
-
 function renderMenuAdmin() {
   const storeId = currentStoreId();
-  if (!storeId) {
+  if (!approved() || !storeId) {
     $("#menuAdminView").innerHTML = requireStoreHtml();
-    $("#emptySeed").onclick = createDemoStore;
+    const seed = $("#emptySeed");
+    if (seed) seed.onclick = createInitialStore;
     return;
   }
   const products = storeProducts(storeId);
@@ -313,25 +373,75 @@ function renderMenuAdmin() {
   $$("[data-edit-product]").forEach(btn => btn.onclick = () => openProductDialog(btn.dataset.editProduct));
 }
 function renderCourier() {
+  if (!approved()) { $("#courierView").innerHTML = pendingHtml(); return; }
   const orders = state.orders.filter(o => !["delivered", "cancelled"].includes(o.status));
   $("#courierView").innerHTML = `<div class="panel"><h2>Entregas disponíveis</h2>${orders.map(o => `<article class="order-card"><h4>#${esc(o.shortId || o.id.slice(0,6))} · ${esc(o.customer?.name || "Cliente")}</h4><p>${esc(address(o))}</p><div class="order-actions"><a class="btn primary" href="${mapsUrl(o)}" target="_blank">Google Maps</a><a class="btn soft" href="${wazeUrl(o)}" target="_blank">Waze</a><button class="btn ghost" data-claim="${o.id}">Assumir</button><button class="btn soft" data-done="${o.id}">Dar baixa</button></div></article>`).join("") || "<div class='empty'>Nenhuma entrega.</div>"}</div>`;
   $$("[data-claim]").forEach(btn => btn.onclick = async () => updateDoc(doc(db, "orders", btn.dataset.claim), { assignedCourierId: state.user.uid, updatedAt: serverTimestamp() }));
   $$("[data-done]").forEach(btn => btn.onclick = async () => updateDoc(doc(db, "orders", btn.dataset.done), { status: "delivered", paidReceived: true, deliveredAt: serverTimestamp(), updatedAt: serverTimestamp() }));
 }
 function renderSettings() {
+  const ui = JSON.parse(localStorage.getItem("mf-ui") || "{}");
   const s = state.activeStore;
-  $("#settingsView").innerHTML = `<div class="panel"><h2>Configurações da loja</h2><div class="form-grid"><label>Nome<input id="storeName" value="${esc(s?.name || "")}"></label><label>Slug<input id="storeSlug" value="${esc(s?.slug || "")}"></label><label>WhatsApp<input id="storeWhatsapp" value="${esc(s?.whatsapp || "")}"></label><label>Taxa entrega<input id="storeFee" value="${s?.deliveryFee || 0}"></label><label>Pedido mínimo<input id="storeMin" value="${s?.minOrder || 0}"></label><label class="wide">Chamada<input id="storeHeadline" value="${esc(s?.headline || "")}"></label></div><button class="btn primary" id="saveStore" type="button">Salvar loja</button></div>`;
+  $("#settingsView").innerHTML = `<div class="workspace-grid grid-2">
+    <article class="settings-card"><h2>Aparência do painel</h2><p>Personalize o tema do painel neste dispositivo.</p><label>Modo<select id="uiMode"><option value="dark">Escuro</option><option value="light">Claro</option></select></label><label>Densidade<select id="uiDensity"><option value="normal">Normal</option><option value="compact">Compacto</option></select></label><p>Paleta</p><div class="color-dots"><button class="color-dot" data-palette="default"></button><button class="color-dot" data-palette="warm"></button><button class="color-dot" data-palette="forest"></button><button class="color-dot" data-palette="royal"></button></div><button class="btn primary" id="saveUi" type="button">Salvar aparência</button></article>
+    <article class="settings-card"><h2>Identidade da loja</h2><p>Configurações públicas do cardápio.</p><label>Nome<input id="storeName" value="${esc(s?.name || "")}"></label><label>Slug público<input id="storeSlug" value="${esc(s?.slug || "")}"></label><label>WhatsApp<input id="storeWhatsapp" value="${esc(s?.whatsapp || "")}"></label><label>Taxa entrega<input id="storeFee" value="${s?.deliveryFee || 0}"></label><label>Pedido mínimo<input id="storeMin" value="${s?.minOrder || 0}"></label><label>Chamada<input id="storeHeadline" value="${esc(s?.headline || "")}"></label><button class="btn primary" id="saveStore" type="button">Salvar loja</button></article>
+  </div>`;
+  $("#uiMode").value = ui.mode || "dark";
+  $("#uiDensity").value = ui.density || "normal";
+  $$(".color-dot").forEach(btn => btn.onclick = () => {
+    saveUiSettings({ mode: $("#uiMode").value, density: $("#uiDensity").value, palette: btn.dataset.palette });
+    toast("Paleta aplicada.", "ok");
+  });
+  $("#saveUi").onclick = () => { saveUiSettings({ mode: $("#uiMode").value, density: $("#uiDensity").value, palette: ui.palette || "default" }); toast("Aparência salva.", "ok"); };
   $("#saveStore").onclick = saveStore;
+
+  $("#settingsView").insertAdjacentHTML("beforeend", `<div class="panel" style="margin-top:16px"><h2>Credenciais do administrador</h2><p style="color:var(--muted);line-height:1.7">Use isto para trocar o e-mail/senha inicial do instalador. O login inicial é <b>admin</b> / <b>admin123</b>; após trocar, use o novo e-mail.</p><div class="form-grid"><label>Novo e-mail admin<input id="newAdminEmail" type="email" placeholder="seuemail@dominio.com"></label><label>Nova senha<input id="newAdminPassword" type="password" minlength="6" placeholder="mínimo 6 caracteres"></label></div><button class="btn primary" id="changeCredentials" type="button">Atualizar credenciais</button></div>`);
+
+  $("#changeCredentials").onclick = async () => {
+    const newEmail = $("#newAdminEmail").value.trim();
+    const newPassword = $("#newAdminPassword").value.trim();
+
+    if (!newEmail && !newPassword) return toast("Informe novo e-mail ou nova senha.", "err");
+
+    try {
+      if (newEmail) await updateEmail(auth.currentUser, newEmail);
+      if (newPassword) await updatePassword(auth.currentUser, newPassword);
+
+      await setDoc(doc(db, "users", state.user.uid), {
+        email: auth.currentUser.email,
+        bootstrapAdmin: false,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      toast("Credenciais atualizadas. No próximo login use o novo e-mail.", "ok");
+    } catch (err) {
+      toast("Não foi possível trocar credenciais: " + err.message, "err");
+    }
+  };
+}
+function renderApprovals() {
+  if (!isDev()) { $("#approvalsView").innerHTML = `<div class="empty">Acesso restrito.</div>`; return; }
+  const pending = state.users.filter(u => u.status === "pending" || u.role === "pending");
+  $("#approvalsView").innerHTML = `<div class="panel"><h2>Contas aguardando aprovação</h2>${pending.map(u => `<article class="approval-card"><div class="badges"><span class="badge warn">Pendente</span><span class="badge">${esc(u.requestedRole || "merchant")}</span></div><h3>${esc(u.name || u.email)}</h3><p>${esc(u.email)}</p><div class="approval-actions"><button class="btn primary" data-approve="${u.id || u.uid}:${u.requestedRole || "merchant"}" type="button">Aprovar</button><button class="btn danger" data-reject="${u.id || u.uid}" type="button">Rejeitar</button></div></article>`).join("") || "<div class='empty'>Nenhuma conta pendente.</div>"}</div>`;
+  $$("[data-approve]").forEach(btn => btn.onclick = async () => {
+    const [uid, requestedRole] = btn.dataset.approve.split(":");
+    await setDoc(doc(db, "users", uid), { role: requestedRole, status: "approved", approvedBy: state.user.uid, approvedAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
+    toast("Conta aprovada.", "ok");
+  });
+  $$("[data-reject]").forEach(btn => btn.onclick = async () => {
+    await setDoc(doc(db, "users", btn.dataset.reject), { status: "rejected", updatedAt: serverTimestamp() }, { merge: true });
+    toast("Conta rejeitada.", "ok");
+  });
 }
 function renderDeveloper() {
-  $("#developerView").innerHTML = `<div class="workspace-grid grid-4"><article class="metric-card"><span>Lojas</span><strong>${state.stores.length}</strong></article><article class="metric-card"><span>Pedidos</span><strong>${state.orders.length}</strong></article><article class="metric-card"><span>Produtos</span><strong>${state.products.length}</strong></article><article class="metric-card"><span>Categorias</span><strong>${state.categories.length}</strong></article></div>`;
+  $("#developerView").innerHTML = `<div class="workspace-grid grid-4"><article class="metric-card"><span>Lojas</span><strong>${state.stores.length}</strong></article><article class="metric-card"><span>Pedidos</span><strong>${state.orders.length}</strong></article><article class="metric-card"><span>Produtos</span><strong>${state.products.length}</strong></article><article class="metric-card"><span>Usuários</span><strong>${state.users.length}</strong></article></div>`;
 }
 
-async function createDemoStore() {
-  if (!state.user) return openAuth();
+async function createInitialStore() {
+  if (!approved() && !isDev()) return toast("Sua conta precisa ser aprovada antes de criar loja.", "err");
   try {
     const storeRef = doc(collection(db, "stores"));
-    await setDoc(storeRef, { name: "MenuForge Demo Delivery", slug: "menu-forge-demo", ownerId: state.user.uid, status: "open", whatsapp: "5549999999999", deliveryFee: 7, minOrder: 20, headline: "Loja demo para testar cardápio, pedidos e entregador.", createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    await setDoc(storeRef, { name: "Minha Loja MenuForge", slug: "minha-loja", ownerId: state.user.uid, status: "open", whatsapp: "5549999999999", deliveryFee: 7, minOrder: 20, headline: "Cardápio digital da minha loja.", createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     const c1 = doc(collection(db, "categories")), c2 = doc(collection(db, "categories")), c3 = doc(collection(db, "categories"));
     await setDoc(c1, { storeId: storeRef.id, name: "Lanches", order: 1 });
     await setDoc(c2, { storeId: storeRef.id, name: "Combos", order: 2 });
@@ -339,10 +449,10 @@ async function createDemoStore() {
     await addDoc(collection(db, "products"), { storeId: storeRef.id, categoryId: c1.id, name: "Burger Imperial", price: 31.9, active: true, featured: true, prepTime: 20, description: "Blend da casa, queijo duplo e molho especial.", emoji: "🍔" });
     await addDoc(collection(db, "products"), { storeId: storeRef.id, categoryId: c2.id, name: "Combo Família", price: 79.9, active: true, featured: true, prepTime: 35, description: "3 burgers, batata e refrigerante.", emoji: "🍟" });
     await addDoc(collection(db, "products"), { storeId: storeRef.id, categoryId: c3.id, name: "Refrigerante lata", price: 6.5, active: true, prepTime: 2, description: "Bebida gelada.", emoji: "🥤" });
-    await setDoc(doc(db, "users", state.user.uid), { role: "merchant", currentStoreId: storeRef.id, updatedAt: serverTimestamp() }, { merge: true });
-    state.profile = { ...state.profile, role: "merchant", currentStoreId: storeRef.id };
-    toast("Loja demo criada.", "ok");
-  } catch (err) { toast("Erro ao criar demo: " + err.message, "err"); }
+    await setDoc(doc(db, "users", state.user.uid), { currentStoreId: storeRef.id, updatedAt: serverTimestamp() }, { merge: true });
+    state.profile = { ...state.profile, currentStoreId: storeRef.id };
+    toast("Loja inicial criada.", "ok");
+  } catch (err) { toast("Erro ao criar loja: " + err.message, "err"); }
 }
 async function saveStore() {
   const payload = { name: $("#storeName").value.trim(), slug: $("#storeSlug").value.trim(), whatsapp: $("#storeWhatsapp").value.trim(), deliveryFee: toNumber($("#storeFee").value), minOrder: toNumber($("#storeMin").value), headline: $("#storeHeadline").value.trim(), ownerId: state.user.uid, updatedAt: serverTimestamp() };
@@ -350,12 +460,13 @@ async function saveStore() {
     if (state.activeStore?.id) await updateDoc(doc(db, "stores", state.activeStore.id), payload);
     else {
       const ref = await addDoc(collection(db, "stores"), { ...payload, createdAt: serverTimestamp() });
-      await setDoc(doc(db, "users", state.user.uid), { role: "merchant", currentStoreId: ref.id }, { merge: true });
+      await setDoc(doc(db, "users", state.user.uid), { currentStoreId: ref.id }, { merge: true });
     }
     toast("Loja salva.", "ok");
   } catch (err) { toast(err.message, "err"); }
 }
 function openProductDialog(id = null) {
+  if (!approved()) return toast("Conta pendente.", "err");
   const form = $("#productForm");
   form.reset();
   form.elements.id.value = "";
@@ -372,7 +483,7 @@ async function saveProduct(e) {
   e.preventDefault();
   const fd = new FormData(e.currentTarget);
   const id = fd.get("id");
-  const payload = { storeId: currentStoreId(), categoryId: fd.get("categoryId"), name: fd.get("name"), price: toNumber(fd.get("price")), active: fd.get("active") === "true", featured: fd.get("featured") === "true", description: fd.get("description"), prepTime: Number(fd.get("prepTime") || 20), updatedAt: serverTimestamp() };
+  const payload = { storeId: currentStoreId(), categoryId: fd.get("categoryId"), name: fd.get("name"), price: toNumber(fd.get("price")), active: fd.get("active") === "true", featured: fd.get("featured") === "true", description: fd.get("description"), prepTime: Number(fd.get("prepTime") || 20), emoji: "🍽️", updatedAt: serverTimestamp() };
   try {
     if (id) await updateDoc(doc(db, "products", id), payload);
     else await addDoc(collection(db, "products"), { ...payload, createdAt: serverTimestamp() });
@@ -393,9 +504,9 @@ async function saveCategory(e) {
 
 function openAuth() { $("#authModal").classList.remove("hidden"); }
 function closeAuth() { $("#authModal").classList.add("hidden"); }
-async function enter(user, initialRole = "merchant") {
+async function enter(user, requestedRole = "merchant") {
   state.user = user;
-  state.profile = await ensureProfile(user, initialRole);
+  state.profile = await ensureProfile(user, requestedRole);
   closeAuth();
   subscribe();
   location.hash = "#/admin";
@@ -404,11 +515,50 @@ async function enter(user, initialRole = "merchant") {
 async function login(e) {
   e.preventDefault();
   const fd = new FormData(e.currentTarget);
+  const identifier = String(fd.get("email") || "").trim();
+  const password = String(fd.get("password") || "");
+  const email = loginIdentifierToEmail(identifier);
+
   try {
-    const cred = await signInWithEmailAndPassword(auth, fd.get("email"), fd.get("password"));
+    let cred;
+
+    if (identifier.toLowerCase() === "admin" && password === BOOT_ADMIN_PASSWORD) {
+      try {
+        cred = await createUserWithEmailAndPassword(auth, BOOT_ADMIN_EMAIL, BOOT_ADMIN_PASSWORD);
+        await updateProfile(cred.user, { displayName: "Administrador" });
+      } catch (createErr) {
+        if (createErr.code === "auth/email-already-in-use") {
+          cred = await signInWithEmailAndPassword(auth, BOOT_ADMIN_EMAIL, BOOT_ADMIN_PASSWORD);
+        } else {
+          throw createErr;
+        }
+      }
+
+      await setDoc(doc(db, "users", cred.user.uid), {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        name: "Administrador",
+        role: "developer",
+        requestedRole: "developer",
+        status: "approved",
+        bootstrapAdmin: true,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      await setDoc(doc(db, "system", "setup"), {
+        installed: true,
+        installedBy: cred.user.uid,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } else {
+      cred = await signInWithEmailAndPassword(auth, email, password);
+    }
+
     await enter(cred.user, "merchant");
     toast("Login realizado.", "ok");
-  } catch (err) { toast("Login falhou: " + err.message, "err"); }
+  } catch (err) {
+    toast("Login falhou: " + err.message, "err");
+  }
 }
 async function register(e) {
   e.preventDefault();
@@ -416,8 +566,10 @@ async function register(e) {
   try {
     const cred = await createUserWithEmailAndPassword(auth, fd.get("email"), fd.get("password"));
     await updateProfile(cred.user, { displayName: fd.get("name") });
-    await setDoc(doc(db, "users", cred.user.uid), { uid: cred.user.uid, email: cred.user.email, name: fd.get("name"), role: fd.get("role"), createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
-    await enter(cred.user, fd.get("role"));
+    const requestedRole = fd.get("requestedRole");
+    const owner = cred.user.email === OWNER_EMAIL;
+    await setDoc(doc(db, "users", cred.user.uid), { uid: cred.user.uid, email: cred.user.email, name: fd.get("name"), requestedRole, role: owner ? "developer" : requestedRole === "customer" ? "customer" : "pending", status: owner || requestedRole === "customer" ? "approved" : "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
+    await enter(cred.user, requestedRole);
   } catch (err) { toast("Cadastro falhou: " + err.message, "err"); }
 }
 async function googleAuth() {
@@ -450,10 +602,12 @@ function bind() {
   $("#closeCart").onclick = () => $("#cartDrawer").classList.add("hidden");
   $("#checkoutButton").onclick = () => state.cart.length ? $("#checkoutDialog").showModal() : toast("Carrinho vazio.", "err");
   $("#checkoutForm").onsubmit = e => { if (e.submitter?.value === "cancel") return; e.preventDefault(); submitOrder(e.currentTarget); };
-  $("#toggleSidebar").onclick = () => $("#adminSidebar").classList.toggle("open");
+  $("#toggleSidebar").onclick = openSidebar;
+  $("#closeSidebar").onclick = closeSidebar;
+  $("#sidebarBackdrop").onclick = closeSidebar;
   $("#logoutButton").onclick = () => signOut(auth);
-  $("#themeToggle").onclick = () => { document.body.classList.toggle("light"); localStorage.setItem("mf-theme", document.body.classList.contains("light") ? "light" : "dark"); };
-  $("#seedDemo").onclick = createDemoStore;
+  $("#quickSettings").onclick = () => showAdmin("settingsView");
+  $("#seedDemo").onclick = createInitialStore;
   $("#newProductTop").onclick = () => openProductDialog();
   $("#productForm").onsubmit = saveProduct;
   $("#categoryForm").onsubmit = saveCategory;
@@ -461,7 +615,7 @@ function bind() {
 }
 
 function init() {
-  if (localStorage.getItem("mf-theme") === "light") document.body.classList.add("light");
+  applyUiSettings();
   bind();
   renderMenuPage();
   renderCart();
