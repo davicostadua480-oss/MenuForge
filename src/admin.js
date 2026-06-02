@@ -661,10 +661,11 @@ async function googleAuth(){
 function bind(){
   window.FORGECMS_READY = true;
   if (window.FORGECMS_BOOT_TIMER) clearTimeout(window.FORGECMS_BOOT_TIMER);
+  document.getElementById("forgecmsBootWarning")?.remove();
   $("#boot").hidden = true;
-  $("#loginForm").onsubmit = login;
-  $("#requestForm").onsubmit = requestAccess;
-  $("#googleLogin").onclick = googleAuth;
+  if ($("#loginForm")) $("#loginForm").onsubmit = login;
+  if ($("#requestForm")) $("#requestForm").onsubmit = requestAccess;
+  if ($("#googleLogin")) $("#googleLogin").onclick = googleAuth;
   $$("[data-auth-tab]").forEach(btn => btn.onclick = () => {
     $$("[data-auth-tab]").forEach(b=>b.classList.toggle("active", b === btn));
     $("#loginForm").classList.toggle("hidden", btn.dataset.authTab !== "login");

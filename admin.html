@@ -7,7 +7,11 @@
   <meta name="description" content="ForgeCMS — CMS em Firebase inspirado no fluxo administrativo do WordPress." />
   <meta name="theme-color" content="#080d1b" />
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="./styles.css?v=admin2" />
+  <link rel="stylesheet" href="./styles.css?v=admin3" />
+  <style id="forgecms-nonblocking-toast-style">
+    .toast-area, .toast { pointer-events: none !important; }
+    #forgecmsBootWarning { max-width: min(92vw, 520px); opacity: .92; }
+  </style>
 </head>
 <body class="admin-body">
   <div id="boot" class="boot">
@@ -205,11 +209,11 @@
           var warning = document.createElement("div");
           warning.id = "forgecmsBootWarning";
           warning.className = "toast err";
-          warning.textContent = "Modo recuperação: o painel demorou para carregar. Se o login não responder, recarregue com ?v=admin2 ou confira conexão/CDN Firebase.";
+          warning.textContent = "Aviso: o Firebase demorou para carregar nesta rede. Aguarde alguns segundos; se o botão não responder, recarregue com ?v=admin3.";
           toastArea.appendChild(warning);
         }
       }
-    }, 4500);
+    }, 15000);
 
     window.addEventListener("error", function (event) {
       var boot = document.getElementById("boot");
@@ -227,7 +231,7 @@
       console.error("ForgeCMS unhandled rejection:", event.reason);
     });
   </script>
-  <script type="module" src="./src/admin.js?v=admin2"></script>
+  <script type="module" src="./src/admin.js?v=admin3"></script>
 </body>
 </html>
 
