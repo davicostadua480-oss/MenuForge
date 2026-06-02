@@ -121,11 +121,21 @@ function applyTheme(){
 
 function showLogin(){
   $("#boot").hidden = true;
+  const loginSubmit = $("#loginSubmit");
+  if (loginSubmit) {
+    loginSubmit.disabled = false;
+    loginSubmit.textContent = "Entrar";
+  }
   $("#loginScreen").classList.remove("hidden");
   $("#adminShell").classList.add("hidden");
 }
 function showShell(){
   $("#boot").hidden = true;
+  const loginSubmit = $("#loginSubmit");
+  if (loginSubmit) {
+    loginSubmit.disabled = false;
+    loginSubmit.textContent = "Entrar";
+  }
   $("#loginScreen").classList.add("hidden");
   $("#adminShell").classList.remove("hidden");
 }
@@ -663,6 +673,11 @@ function bind(){
   if (window.FORGECMS_BOOT_TIMER) clearTimeout(window.FORGECMS_BOOT_TIMER);
   document.getElementById("forgecmsBootWarning")?.remove();
   $("#boot").hidden = true;
+  const loginSubmit = $("#loginSubmit");
+  if (loginSubmit) {
+    loginSubmit.disabled = false;
+    loginSubmit.textContent = "Entrar";
+  }
   if ($("#loginForm")) $("#loginForm").onsubmit = login;
   if ($("#requestForm")) $("#requestForm").onsubmit = requestAccess;
   if ($("#googleLogin")) $("#googleLogin").onclick = googleAuth;

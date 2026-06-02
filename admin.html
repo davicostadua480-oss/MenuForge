@@ -7,7 +7,7 @@
   <meta name="description" content="ForgeCMS — CMS em Firebase inspirado no fluxo administrativo do WordPress." />
   <meta name="theme-color" content="#080d1b" />
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="./styles.css?v=admin3" />
+  <link rel="stylesheet" href="./styles.css?v=admin4" />
   <style id="forgecms-nonblocking-toast-style">
     .toast-area, .toast { pointer-events: none !important; }
     #forgecmsBootWarning { max-width: min(92vw, 520px); opacity: .92; }
@@ -51,7 +51,7 @@
         <button data-auth-tab="request" type="button">Solicitar acesso</button>
       </div>
 
-      <form id="loginForm" class="auth-form">
+      <form id="loginForm" class="auth-form" action="javascript:void(0)" onsubmit="return false">
         <div class="install-note">
           <strong>Instalação inicial</strong>
           <span>Usuário: <b>admin</b> · Senha: <b>admin123</b>. Depois altere em Configurações → Segurança.</span>
@@ -59,11 +59,11 @@
 
         <label>Usuário ou e-mail <input name="identifier" type="text" autocomplete="username" required></label>
         <label>Senha <input name="password" type="password" autocomplete="current-password" required></label>
-        <button class="btn primary full" type="submit">Entrar</button>
+        <button id="loginSubmit" class="btn primary full" type="submit" disabled>Carregando login...</button>
         <button id="googleLogin" class="btn google full" type="button"><span>G</span> Entrar com Google</button>
       </form>
 
-      <form id="requestForm" class="auth-form hidden">
+      <form id="requestForm" class="auth-form hidden" action="javascript:void(0)" onsubmit="return false">
         <label>Nome completo <input name="name" autocomplete="name" required></label>
         <label>E-mail <input name="email" type="email" autocomplete="email" required></label>
         <label>Senha <input name="password" type="password" minlength="6" autocomplete="new-password" required></label>
@@ -231,7 +231,7 @@
       console.error("ForgeCMS unhandled rejection:", event.reason);
     });
   </script>
-  <script type="module" src="./src/admin.js?v=admin3"></script>
+  <script type="module" src="./src/admin.js?v=admin4"></script>
 </body>
 </html>
 
