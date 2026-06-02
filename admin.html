@@ -224,10 +224,11 @@ function opt(){st.options={};st.optList.forEach(function(o){st.options[o.id]=o})
 
 function niceAuthError(err){
   var code=(err&&err.code)||"";
-  if(code==="auth/invalid-credential"||code==="auth/wrong-password"||code==="auth/user-not-found") return "Usuário ou senha incorretos.";
+  if(code==="auth/invalid-credential"||code==="auth/invalid-login-credentials"||code==="auth/wrong-password"||code==="auth/user-not-found") return "Usuário ou senha incorretos.";
   if(code==="auth/too-many-requests") return "Muitas tentativas. Aguarde um pouco e tente novamente.";
   if(code==="auth/network-request-failed") return "Falha de conexão. Verifique a internet e tente novamente.";
   if(code==="auth/invalid-email") return "E-mail inválido.";
+  if(code && code.indexOf("auth/")!==0) return "Erro do sistema: "+(err.message||code);
   return "Login falhou. Tente novamente.";
 }
 
@@ -238,32 +239,29 @@ function doLogin(){
   if(!id||!pass){toast("Preencha usuário e senha.","err");return}
   busy(true,"Entrando...");
   initFirebase().then(function(){
-    if(id.toLowerCase()==="admin"&&pass===BOOT_PASS){
-      return st.auth.createUserWithEmailAndPassword(BOOT_EMAIL,BOOT_PASS)
-        .then(function(cred){return cred.user.updateProfile({displayName:"Administrador"}).then(function(){return cred})})
-        .catch(function(err){if(err.code==="auth/email-already-in-use")return st.auth.signInWithEmailAndPassword(BOOT_EMAIL,BOOT_PASS);throw err})
-        .then(function(cred){
-          return st.db.collection("users").doc(cred.user.uid).set({uid:cred.user.uid,email:cred.user.email,name:"Administrador",role:"super_admin",requestedRole:"super_admin",status:"approved",updatedAt:ts()},{merge:true}).then(function(){return cred});
-        });
-    }
-    return st.auth.signInWithEmailAndPassword(id.toLowerCase()==="admin"?BOOT_EMAIL:id,pass);
-  }).then(function(cred){
-    st.user=cred.user;
-    return ensureProfile(cred.user);
-  }).then(function(profile){
-    st.profile=profile;
-    return seed();
+    return st.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
   }).then(function(){
-    subscribe();
-    showShell();
-    if(!location.hash||location.hash==="#") location.hash="#/dashboard";
-    route();
+    var login=String(id||"").toLowerCase();
+    if(login==="admin"){
+      return st.auth.signInWithEmailAndPassword(BOOT_EMAIL,pass).catch(function(err){
+        if(pass===BOOT_PASS){
+          return st.auth.createUserWithEmailAndPassword(BOOT_EMAIL,BOOT_PASS)
+            .then(function(cred){return cred.user.updateProfile({displayName:"Administrador"}).then(function(){return cred})})
+            .catch(function(createErr){
+              if(createErr.code==="auth/email-already-in-use") return st.auth.signInWithEmailAndPassword(BOOT_EMAIL,BOOT_PASS);
+              throw err;
+            });
+        }
+        throw err;
+      });
+    }
+    return st.auth.signInWithEmailAndPassword(login,pass);
+  }).then(function(){
     toast("Login realizado.","ok");
   }).catch(function(err){
     toast(niceAuthError(err),"err");
   }).finally(function(){busy(false)});
 }
-
 function requestAccess(){
   var f=new FormData($("#reqForm"));
   busy(true,"Criando...");
@@ -301,7 +299,7 @@ function bootAuth(){
       st.user=user;
       ensureProfile(user).then(function(profile){
         st.profile=profile;
-        return seed();
+        return seed().catch(function(e){console.warn("seed falhou",e);});
       }).then(function(){
         subscribe();
         showShell();
