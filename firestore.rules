@@ -1,1 +1,35 @@
-rules_version='2';service cloud.firestore{match /databases/{database}/documents{function signedIn(){return request.auth!=null}function userDoc(){return get(/databases/$(database)/documents/users/$(request.auth.uid))}function dev(){return signedIn()&&exists(/databases/$(database)/documents/users/$(request.auth.uid))&&userDoc().data.role in ['developer','admin']}function owner(storeId){return signedIn()&&exists(/databases/$(database)/documents/stores/$(storeId))&&get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId==request.auth.uid}match /users/{id}{allow read,create,update:if signedIn()&&(request.auth.uid==id||dev());allow delete:if dev()}match /stores/{id}{allow read:if true;allow create:if signedIn();allow update,delete:if dev()||(signedIn()&&resource.data.ownerId==request.auth.uid)}match /categories/{id}{allow read:if true;allow create:if signedIn()&&(dev()||owner(request.resource.data.storeId));allow update,delete:if signedIn()&&(dev()||owner(resource.data.storeId))}match /products/{id}{allow read:if true;allow create:if signedIn()&&(dev()||owner(request.resource.data.storeId));allow update,delete:if signedIn()&&(dev()||owner(resource.data.storeId))}match /orders/{id}{allow create:if true;allow read:if signedIn()&&(dev()||resource.data.customer.uid==request.auth.uid||resource.data.assignedCourierId==request.auth.uid||owner(resource.data.storeId));allow update:if signedIn()&&(dev()||resource.data.assignedCourierId==request.auth.uid||owner(resource.data.storeId));allow delete:if dev()||owner(resource.data.storeId)}match /{document=**}{allow read,write:if dev()}}}
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /stores/{storeId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    match /orders/{orderId} {
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if request.auth != null;
+    }
+
+    match /{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
