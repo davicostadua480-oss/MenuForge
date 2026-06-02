@@ -7,7 +7,7 @@
   <meta name="description" content="ForgeCMS — CMS em Firebase inspirado no fluxo administrativo do WordPress." />
   <meta name="theme-color" content="#080d1b" />
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="./styles.css?v=admin4" />
+  <link rel="stylesheet" href="./styles.css?v=definitivo" />
   <style id="forgecms-nonblocking-toast-style">
     .toast-area, .toast { pointer-events: none !important; }
     #forgecmsBootWarning { max-width: min(92vw, 520px); opacity: .92; }
@@ -59,7 +59,7 @@
 
         <label>Usuário ou e-mail <input name="identifier" type="text" autocomplete="username" required></label>
         <label>Senha <input name="password" type="password" autocomplete="current-password" required></label>
-        <button id="loginSubmit" class="btn primary full" type="submit" disabled>Carregando login...</button>
+        <button id="loginSubmit" class="btn primary full" type="submit">Entrar</button>
         <button id="googleLogin" class="btn google full" type="button"><span>G</span> Entrar com Google</button>
       </form>
 
@@ -231,7 +231,7 @@
       console.error("ForgeCMS unhandled rejection:", event.reason);
     });
   </script>
-  <script type="module" src="./src/admin.js?v=admin4"></script>
+  <script type="module" src="./src/admin.js?v=definitivo"></script>
 </body>
 </html>
 
