@@ -16,7 +16,8 @@ const state = {
   activeStore: null,
   menuCategory: "all",
   menuSearch: "",
-  cart: JSON.parse(localStorage.getItem("mf-cart") || "[]")
+  cart: JSON.parse(localStorage.getItem("mf-cart") || "[]"),
+  storesLoaded: false
 };
 
 function money(v){ return BRL.format(Number(v || 0)); }
@@ -34,7 +35,7 @@ function demoProducts(){ return [
   { id:"p3", storeId:"demo", categoryId:"drinks", name:"Refrigerante lata", price:6.5, active:true, prepTime:2, description:"Escolha o sabor nas observações.", emoji:"🥤" }
 ];}
 function storeCategories(storeId){ const list=state.categories.filter(c=>c.storeId===storeId); return list.length ? list : storeId==="demo" ? demoCategories() : []; }
-function storeProducts(storeId){ const list=state.products.filter(p=>p.storeId===storeId); return list.length ? list : storeId==="demo" ? demoProducts() : []; }
+function storeProducts(storeId){ const list=state.products.filter(p=>p.storeId===storeId); return storeId==="demo" ? demoProducts() : list; }
 
 function show(view){
   ["homeView","featuresView","menuView"].forEach(id => $("#"+id).classList.add("hidden"));
@@ -45,7 +46,11 @@ function route(){
   if(hash === "#/recursos"){ show("featuresView"); return; }
   if(hash.startsWith("#/cardapio")){
     const key = decodeURIComponent(hash.split("/")[2] || "demo");
-    state.activeStore = state.stores.find(s => s.slug === key || slug(s) === key) || demoStore();
+    if(key === "demo"){
+      state.activeStore = demoStore();
+    }else{
+      state.activeStore = state.stores.find(s => s.id === key || s.slug === key || slug(s) === key) || null;
+    }
     show("menuView");
     renderMenu();
     return;
@@ -53,7 +58,14 @@ function route(){
   show("homeView");
 }
 function renderMenu(){
-  const store = state.activeStore || demoStore();
+  const store = state.activeStore;
+  if(!store){
+    $("#storeHero").innerHTML = `<div class="publicMissing"><h1>Loja não encontrada</h1><p>${state.storesLoaded ? "Essa loja ainda não existe ou o link está errado." : "Carregando loja..."}</p></div>`;
+    $("#categoryList").innerHTML = "";
+    $("#productGrid").innerHTML = `<div class="empty">${state.storesLoaded ? "Volte ao painel e confira o slug da loja." : "Aguarde os dados carregarem."}</div>`;
+    renderCart();
+    return;
+  }
   const categories = storeCategories(store.id);
   let products = storeProducts(store.id).filter(p => p.active !== false);
   if(state.menuCategory !== "all") products = products.filter(p => p.categoryId === state.menuCategory);
@@ -63,7 +75,7 @@ function renderMenu(){
   $("#storeHero").innerHTML = `<h1>${esc(store.name)}</h1><p>${esc(store.headline || "Cardápio digital inteligente.")}</p><div class="badges"><span class="badge ok">${store.status === "closed" ? "Fechado" : "Aberto"}</span><span class="badge">Entrega ${money(store.deliveryFee)}</span><span class="badge">Mínimo ${money(store.minOrder)}</span></div>`;
   $("#categoryList").innerHTML = `<button class="cat-btn ${state.menuCategory === "all" ? "active" : ""}" data-cat="all">Tudo</button>` + categories.map(c => `<button class="cat-btn ${state.menuCategory === c.id ? "active" : ""}" data-cat="${c.id}">${esc(c.name)}</button>`).join("");
   $$("#categoryList [data-cat]").forEach(btn => btn.onclick = () => { state.menuCategory = btn.dataset.cat; renderMenu(); });
-  $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card"><div class="product-img">${p.emoji || ["🍔","🍕","🥤","🍟"][i%4]}</div><div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">Adicionar</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto.</div>`;
+  $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card"><div class="product-img">${p.emoji || ["🍔","🍕","🥤","🍟"][i%4]}</div><div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">Adicionar</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto cadastrado nesta loja ainda.</div>`;
   $$("[data-add]").forEach(btn => btn.onclick = () => addToCart(btn.dataset.add));
   renderCart();
 }
@@ -137,7 +149,7 @@ function bind(){
   window.addEventListener("hashchange", route);
 }
 function subscribe(){
-  onSnapshot(collection(db,"stores"), snap => { state.stores=snap.docs.map(d=>({id:d.id,...d.data()})); route(); });
+  onSnapshot(collection(db,"stores"), snap => { state.stores=snap.docs.map(d=>({id:d.id,...d.data()})); state.storesLoaded=true; route(); });
   onSnapshot(collection(db,"categories"), snap => { state.categories=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); });
   onSnapshot(collection(db,"products"), snap => { state.products=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); });
 }
