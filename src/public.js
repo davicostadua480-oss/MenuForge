@@ -7,6 +7,20 @@ const db = getFirestore(app);
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const mfFlavorCss = document.createElement("style");
+mfFlavorCss.id = "mfFlavorDialogStyle";
+mfFlavorCss.textContent = `
+.flavor-modal-back{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:120;display:grid;place-items:end center;padding:12px}
+.flavor-modal{width:min(560px,100%);max-height:88vh;overflow:auto;background:#10192d;border:1px solid rgba(255,255,255,.14);border-radius:24px;padding:18px;color:#f8fafc;box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.flavor-modal h2{margin:0 0 8px}
+.flavor-list{display:grid;gap:8px;margin:14px 0}
+.flavor-choice{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid rgba(255,255,255,.12);background:#17243f;border-radius:16px;padding:12px}
+.flavor-choice input{width:auto}
+.flavor-actions{display:flex;gap:8px;flex-wrap:wrap}
+.flavor-actions .btn{flex:1}
+`;
+document.head.appendChild(mfFlavorCss);
+
 
 const state = {
   options: {},
@@ -75,15 +89,62 @@ function renderMenu(){
   $("#storeHero").innerHTML = `<h1>${esc(store.name)}</h1><p>${esc(store.headline || "Cardápio digital inteligente.")}</p><div class="badges"><span class="badge ok">${store.status === "closed" ? "Fechado" : "Aberto"}</span><span class="badge">Entrega ${money(store.deliveryFee)}</span><span class="badge">Mínimo ${money(store.minOrder)}</span></div>`;
   $("#categoryList").innerHTML = `<button class="cat-btn ${state.menuCategory === "all" ? "active" : ""}" data-cat="all">Tudo</button>` + categories.map(c => `<button class="cat-btn ${state.menuCategory === c.id ? "active" : ""}" data-cat="${c.id}">${esc(c.name)}</button>`).join("");
   $$("#categoryList [data-cat]").forEach(btn => btn.onclick = () => { state.menuCategory = btn.dataset.cat; renderMenu(); });
-  $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card"><div class="product-img">${p.emoji || ["🍔","🍕","🥤","🍟"][i%4]}</div><div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">Adicionar</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto cadastrado nesta loja ainda.</div>`;
-  $$("[data-add]").forEach(btn => btn.onclick = () => addToCart(btn.dataset.add));
+  $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card"><div class="product-img">${p.emoji || ["🍔","🍕","🥤","🍟"][i%4]}</div><div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">${p.multiFlavor ? "Escolher sabores" : "Adicionar"}</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto cadastrado nesta loja ainda.</div>`;
+  $$("[data-add]").forEach(btn => btn.onclick = () => {
+    const product = storeProducts((state.activeStore || demoStore()).id).find(p => p.id === btn.dataset.add);
+    if(product?.multiFlavor) return showFlavorPicker(product);
+    addToCart(btn.dataset.add);
+  });
   renderCart();
 }
-function addToCart(id){
+function showFlavorPicker(product){
+  const max = Math.max(1, Number(product.maxFlavors || 2));
+  const flavors = Array.isArray(product.flavors) ? product.flavors : [];
+  if(!flavors.length){ addToCart(product.id, []); return; }
+
+  const back = document.createElement("div");
+  back.className = "flavor-modal-back";
+  back.innerHTML = `<div class="flavor-modal"><h2>${esc(product.name)}</h2><p>Escolha até ${max} sabor(es). O valor final soma os adicionais.</p><div class="flavor-list">${flavors.map((f,i)=>`<label class="flavor-choice"><span><input type="checkbox" value="${i}"> ${esc(f.name)}</span><b>${Number(f.priceDelta||0)?"+ "+money(f.priceDelta):"sem adicional"}</b></label>`).join("")}</div><div class="flavor-actions"><button class="btn ghost" data-close type="button">Cancelar</button><button class="btn primary" data-confirm type="button">Adicionar</button></div></div>`;
+  document.body.appendChild(back);
+
+  const checks = Array.from(back.querySelectorAll("input[type=checkbox]"));
+  checks.forEach(ch => ch.onchange = () => {
+    const selected = checks.filter(x => x.checked);
+    if(selected.length > max){ ch.checked = false; toast("Máximo de "+max+" sabor(es).", "err"); }
+  });
+
+  back.querySelector("[data-close]").onclick = () => back.remove();
+  back.onclick = e => { if(e.target === back) back.remove(); };
+  back.querySelector("[data-confirm]").onclick = () => {
+    const selected = checks.filter(x => x.checked).map(x => flavors[Number(x.value)]);
+    if(!selected.length) return toast("Escolha pelo menos um sabor.", "err");
+    addToCart(product.id, selected);
+    back.remove();
+  };
+}
+
+function addToCart(id, selectedFlavors=[]){
   const product = storeProducts((state.activeStore || demoStore()).id).find(p => p.id === id);
   if(!product) return;
-  const item = state.cart.find(i => i.id === id);
-  item ? item.qty++ : state.cart.push({ id:product.id, storeId:product.storeId, name:product.name, price:Number(product.price), qty:1 });
+
+  const flavors = Array.isArray(selectedFlavors) ? selectedFlavors : [];
+  const flavorText = flavors.map(f => f.name).join(" / ");
+  const flavorExtra = flavors.reduce((s,f)=>s+Number(f.priceDelta||0),0);
+  const cartId = product.id + (flavorText ? "::" + flavorText : "");
+
+  const item = state.cart.find(i => i.cartId === cartId);
+  item ? item.qty++ : state.cart.push({
+    cartId,
+    id:product.id,
+    storeId:product.storeId,
+    name:product.name,
+    flavors,
+    flavorText,
+    price:Number(product.price) + flavorExtra,
+    basePrice:Number(product.price),
+    qty:1
+  });
+
   saveCart(); renderCart(); toast(product.name + " adicionado.", "ok");
 }
 function cartTotals(){
@@ -93,7 +154,7 @@ function cartTotals(){
 }
 function renderCart(){
   $("#cartCount").textContent = state.cart.reduce((s,i)=>s+i.qty,0);
-  $("#cartItems").innerHTML = state.cart.map(i=>`<div class="cart-item"><div><strong>${esc(i.name)}</strong><br><small>${money(i.price)} un.</small></div><div class="qty"><button data-dec="${i.id}">−</button><b>${i.qty}</b><button data-inc="${i.id}">+</button></div></div>`).join("") || `<div class="empty">Carrinho vazio.</div>`;
+  $("#cartItems").innerHTML = state.cart.map(i=>`<div class="cart-item"><div><strong>${esc(i.name)}</strong>${i.flavorText ? `<br><small>Sabores: ${esc(i.flavorText)}</small>` : ""}<br><small>${money(i.price)} un.</small></div><div class="qty"><button data-dec="${esc(i.cartId || i.id)}">−</button><b>${i.qty}</b><button data-inc="${esc(i.cartId || i.id)}">+</button></div></div>`).join("") || `<div class="empty">Carrinho vazio.</div>`;
   $$("[data-inc]").forEach(b => b.onclick = () => qty(b.dataset.inc, 1));
   $$("[data-dec]").forEach(b => b.onclick = () => qty(b.dataset.dec, -1));
   const t = cartTotals();
@@ -102,10 +163,10 @@ function renderCart(){
   $("#cartTotal").textContent = money(t.total);
 }
 function qty(id,delta){
-  const item = state.cart.find(i=>i.id===id);
+  const item = state.cart.find(i=>(i.cartId || i.id)===id);
   if(!item) return;
   item.qty += delta;
-  if(item.qty <= 0) state.cart = state.cart.filter(i=>i.id!==id);
+  if(item.qty <= 0) state.cart = state.cart.filter(i=>(i.cartId || i.id)!==id);
   saveCart(); renderCart();
 }
 function address(order){ const a=order.address||{}; return [a.street,a.number,a.district,a.complement,a.reference].filter(Boolean).join(", "); }
@@ -135,7 +196,7 @@ async function submitOrder(form){
     if(store.id !== "demo") await addDoc(collection(db,"orders"), order);
     state.cart = []; saveCart(); renderCart();
     $("#checkoutDialog").close(); $("#cartDrawer").classList.add("hidden");
-    if(store.whatsapp) window.open(wa(store.whatsapp, `Novo pedido #${order.shortId}\nTotal: ${money(order.total)}\nCliente: ${order.customer.name}\nEndereço: ${address(order)}`), "_blank", "noopener,noreferrer");
+    if(store.whatsapp) window.open(wa(store.whatsapp, `Novo pedido #${order.shortId}\nTotal: ${money(order.total)}\nCliente: ${order.customer.name}\nEndereço: ${address(order)}\nItens: ${order.items.map(i => `${i.qty}x ${i.name}${i.flavorText ? " ("+i.flavorText+")" : ""}`).join(", ")}`), "_blank", "noopener,noreferrer");
     toast("Pedido criado.", "ok");
   }catch(err){ toast("Erro ao criar pedido: " + err.message, "err"); }
 }
