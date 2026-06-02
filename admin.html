@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ForgeCMS Admin</title>
+  <meta name="description" content="ForgeCMS — CMS em Firebase inspirado no fluxo administrativo do WordPress." />
+  <meta name="theme-color" content="#080d1b" />
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./styles.css?v=admin" />
+</head>
+<body class="admin-body">
+  <div id="boot" class="boot">
+    <div class="boot-logo">FC</div>
+    <p>Inicializando ForgeCMS...</p>
+  </div>
+
+  <div id="toastArea" class="toast-area"></div>
+
+  <main id="loginScreen" class="admin-login hidden">
+    <section class="login-brand-panel">
+      <div class="cms-mark">FC</div>
+      <p class="eyebrow"><i></i> ForgeCMS Admin</p>
+      <h1>Seu WordPress da Shopee, feito para Firebase.</h1>
+      <p>
+        Painel próprio, conteúdo, mídia, usuários, temas, módulos, ferramentas, configurações e o MenuForge instalado como plugin.
+      </p>
+
+      <div class="login-status-grid">
+        <article><strong>Core</strong><span>CMS</span></article>
+        <article><strong>Auth</strong><span>Firebase</span></article>
+        <article><strong>DB</strong><span>Firestore</span></article>
+      </div>
+    </section>
+
+    <section class="login-card">
+      <div class="login-card-head">
+        <div>
+          <small>Admin</small>
+          <h2>Entrar no painel</h2>
+        </div>
+        <a class="btn ghost" href="./?v=forgecms">Site</a>
+      </div>
+
+      <div class="tabs">
+        <button class="active" data-auth-tab="login" type="button">Entrar</button>
+        <button data-auth-tab="request" type="button">Solicitar acesso</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <div class="install-note">
+          <strong>Instalação inicial</strong>
+          <span>Usuário: <b>admin</b> · Senha: <b>admin123</b>. Depois altere em Configurações → Segurança.</span>
+        </div>
+
+        <label>Usuário ou e-mail <input name="identifier" type="text" autocomplete="username" required></label>
+        <label>Senha <input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="btn primary full" type="submit">Entrar</button>
+        <button id="googleLogin" class="btn google full" type="button"><span>G</span> Entrar com Google</button>
+      </form>
+
+      <form id="requestForm" class="auth-form hidden">
+        <label>Nome completo <input name="name" autocomplete="name" required></label>
+        <label>E-mail <input name="email" type="email" autocomplete="email" required></label>
+        <label>Senha <input name="password" type="password" minlength="6" autocomplete="new-password" required></label>
+        <label>Tipo de conta
+          <select name="requestedRole">
+            <option value="merchant">Estabelecimento</option>
+            <option value="courier">Entregador</option>
+            <option value="customer">Cliente</option>
+            <option value="editor">Editor de conteúdo</option>
+          </select>
+        </label>
+        <button class="btn primary full" type="submit">Criar solicitação</button>
+      </form>
+    </section>
+  </main>
+
+  <section id="adminShell" class="admin-shell hidden">
+    <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+
+    <aside id="sidebar" class="cms-sidebar">
+      <div class="sidebar-top">
+        <a class="brand admin-brand" href="#/dashboard">
+          <span>FC</span>
+          <div><strong>ForgeCMS</strong><small id="roleLabel">admin</small></div>
+        </a>
+        <button id="closeSidebar" class="close sidebar-close" type="button">×</button>
+      </div>
+
+      <div class="site-chip">
+        <small>Projeto</small>
+        <strong id="siteChipTitle">MenuForge</strong>
+      </div>
+
+      <nav id="adminNav" class="cms-nav"></nav>
+
+      <div class="sidebar-actions">
+        <button id="quickDraftBtn" class="btn soft full" type="button">Rascunho rápido</button>
+        <button id="logoutBtn" class="btn danger full" type="button">Sair</button>
+      </div>
+    </aside>
+
+    <main class="cms-main">
+      <header class="cms-topbar">
+        <button id="openSidebar" class="icon-btn" type="button">☰</button>
+        <div class="title-block">
+          <small id="routeCrumb">ForgeCMS</small>
+          <h1 id="routeTitle">Dashboard</h1>
+        </div>
+
+        <div class="topbar-actions">
+          <button id="screenOptionsBtn" class="btn ghost" type="button">Opções de tela</button>
+          <button id="newContentTop" class="btn primary" type="button">+ Novo</button>
+        </div>
+      </header>
+
+      <section id="screenOptionsPanel" class="screen-options hidden"></section>
+      <section id="adminView" class="workspace"></section>
+    </main>
+  </section>
+
+  <dialog id="contentDialog">
+    <form id="contentForm" method="dialog" class="dialog-card editor-dialog">
+      <header>
+        <div><small>ForgeCMS</small><h2 id="contentDialogTitle">Conteúdo</h2></div>
+        <button class="close" value="cancel" type="submit">×</button>
+      </header>
+
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Tipo
+          <select name="type">
+            <option value="post">Post</option>
+            <option value="page">Página</option>
+            <option value="banner">Banner</option>
+            <option value="coupon">Cupom</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label>Status
+          <select name="status">
+            <option value="draft">Rascunho</option>
+            <option value="published">Publicado</option>
+            <option value="scheduled">Agendado</option>
+            <option value="private">Privado</option>
+          </select>
+        </label>
+        <label class="wide">Título <input name="title" required></label>
+        <label>Slug <input name="slug"></label>
+        <label>Imagem destacada <input name="featuredImage" placeholder="https://..."></label>
+        <label class="wide">Resumo <textarea name="excerpt" rows="2"></textarea></label>
+        <label class="wide">Conteúdo <textarea name="content" rows="9"></textarea></label>
+      </div>
+
+      <footer>
+        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
+        <button class="btn primary" type="submit">Salvar</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="mediaDialog">
+    <form id="mediaForm" method="dialog" class="dialog-card">
+      <header><h2>Mídia</h2><button class="close" value="cancel" type="submit">×</button></header>
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Título <input name="title" required></label>
+        <label>Tipo <select name="type"><option value="image">Imagem</option><option value="document">Documento</option><option value="video">Vídeo</option></select></label>
+        <label class="wide">URL <input name="url" required placeholder="https://..."></label>
+        <label class="wide">Texto alternativo <input name="alt"></label>
+      </div>
+      <footer><button class="btn ghost" value="cancel" type="submit">Cancelar</button><button class="btn primary" type="submit">Salvar mídia</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="productDialog">
+    <form id="productForm" method="dialog" class="dialog-card">
+      <header><h2>Produto MenuForge</h2><button class="close" value="cancel" type="submit">×</button></header>
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Nome <input name="name" required></label>
+        <label>Preço <input name="price" required></label>
+        <label>Categoria <select name="categoryId"></select></label>
+        <label>Status <select name="active"><option value="true">Ativo</option><option value="false">Oculto</option></select></label>
+        <label class="wide">Descrição <textarea name="description" rows="3"></textarea></label>
+        <label>Preparo min. <input name="prepTime" value="20"></label>
+        <label>Destaque <select name="featured"><option value="false">Não</option><option value="true">Sim</option></select></label>
+      </div>
+      <footer><button class="btn ghost" value="cancel" type="submit">Cancelar</button><button class="btn primary" type="submit">Salvar produto</button></footer>
+    </form>
+  </dialog>
+
+  <script type="module" src="./src/admin.js?v=admin"></script>
+</body>
+</html>
+

@@ -3,27 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>MenuForge — Cardápio Digital Profissional</title>
-  <meta name="description" content="Cardápio digital com pedidos, painel do estabelecimento, entregadores, GPS, WhatsApp, aprovação de contas e personalização." />
-  <meta name="theme-color" content="#090d18" />
+  <title>MenuForge — powered by ForgeCMS</title>
+  <meta name="description" content="Cardápio digital, pedidos, entregas e CMS próprio em Firebase." />
+  <meta name="theme-color" content="#0a0f1e" />
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=40" />
+  <link rel="stylesheet" href="./styles.css?v=forgecms" />
 </head>
 <body>
-  <div id="boot" class="boot">
-    <div class="boot-logo">MF</div>
-    <p>Inicializando MenuForge...</p>
-  </div>
-
   <div id="toastArea" class="toast-area"></div>
 
-  <header id="publicHeader" class="public-header">
-    <a class="brand" href="#/">
+  <header class="public-header">
+    <a class="brand" href="./">
       <span>MF</span>
       <div>
-        <strong>MenuForge</strong>
-        <small>Cardápio, pedidos e entrega</small>
+        <strong id="publicBrand">MenuForge</strong>
+        <small>Cardápio digital + ForgeCMS</small>
       </div>
     </a>
 
@@ -31,64 +26,59 @@
       <a href="#/">Início</a>
       <a href="#/cardapio/demo">Cardápio demo</a>
       <a href="#/recursos">Recursos</a>
+      <a href="./admin.html?v=admin">Admin</a>
     </nav>
 
-    <div class="header-actions">
-      <button id="loginTop" class="btn ghost" type="button">Entrar</button>
-      <button id="startTop" class="btn primary" type="button">Criar conta</button>
-    </div>
+    <a class="btn primary" href="./admin.html?v=admin">Painel</a>
   </header>
 
-  <main id="publicArea">
-    <section id="landingPage" class="hero page-screen">
+  <main id="publicRoot">
+    <section id="homeView" class="hero page-screen">
       <div class="hero-copy">
-        <p class="eyebrow"><i></i> SaaS para delivery local</p>
-        <h1>Cardápio digital com operação, entrega e controle de verdade.</h1>
+        <p class="eyebrow"><i></i> MenuForge instalado sobre ForgeCMS</p>
+        <h1>Um cardápio digital montado sobre um CMS próprio.</h1>
         <p class="lead">
-          O cliente compra pelo link. A loja aprova e prepara. O entregador abre a rota no GPS,
-          confirma recebimento e baixa a entrega. O admin aprova novas contas e controla a plataforma.
+          O ForgeCMS cuida de conteúdo, usuários, temas, módulos e configurações. O MenuForge entra como módulo
+          de delivery: lojas, produtos, pedidos, entregadores e WhatsApp.
         </p>
-
         <div class="actions">
-          <a class="btn primary big" href="#/cardapio/demo">Ver cardápio do cliente</a>
-          <button class="btn soft big" data-open-auth type="button">Entrar no painel</button>
+          <a class="btn primary big" href="#/cardapio/demo">Ver cardápio demo</a>
+          <a class="btn soft big" href="./admin.html?v=admin">Entrar no ForgeCMS</a>
         </div>
-
         <div class="metric-strip">
-          <article><strong>QR</strong><span>cardápio público</span></article>
-          <article><strong>GPS</strong><span>rota de entrega</span></article>
-          <article><strong>ADM</strong><span>aprovação de contas</span></article>
+          <article><strong>CMS</strong><span>núcleo reutilizável</span></article>
+          <article><strong>MF</strong><span>módulo delivery</span></article>
+          <article><strong>FB</strong><span>Firebase/Firestore</span></article>
         </div>
       </div>
 
       <aside class="showcase-card">
-        <div class="device-top"><span>Pedido #M9F2A</span><b>Novo</b></div>
-        <div class="order-preview"><strong>2x Smash Duplo</strong><span>R$ 57,80</span></div>
-        <div class="order-preview"><strong>1x Refrigerante</strong><span>R$ 6,50</span></div>
+        <div class="device-top"><span>ForgeCMS</span><b>online</b></div>
+        <div class="order-preview"><strong>Posts / Páginas</strong><span>conteúdo</span></div>
+        <div class="order-preview"><strong>Produtos / Pedidos</strong><span>delivery</span></div>
         <div class="route-line"><i></i><i></i><i></i><em></em></div>
-        <button class="btn primary full" type="button">Enviar status por WhatsApp</button>
+        <a class="btn primary full" href="./admin.html?v=admin">Acessar admin</a>
       </aside>
     </section>
 
-    <section id="featuresPage" class="content-page page-screen hidden">
+    <section id="featuresView" class="content-page page-screen hidden">
       <div class="section-head">
-        <p class="eyebrow"><i></i> Produto completo</p>
-        <h2>O que já entra nesta versão</h2>
+        <p class="eyebrow"><i></i> Recursos</p>
+        <h2>Um CMS adaptado para web apps estáticos.</h2>
       </div>
 
       <div class="feature-grid">
-        <article><span>🍽️</span><h3>Cardápio público</h3><p>Link por loja, categorias, busca, carrinho e checkout com endereço detalhado.</p></article>
-        <article><span>🔐</span><h3>Aprovação por admin</h3><p>Contas de loja e entregador ficam pendentes até aprovação do desenvolvedor/admin.</p></article>
-        <article><span>🛵</span><h3>Entregador</h3><p>Assumir pedido, abrir Google Maps/Waze e dar baixa no recebimento.</p></article>
-        <article><span>📲</span><h3>WhatsApp sem gambiarra insegura</h3><p>Gera mensagens prontas no navegador; automação real deve ir para backend/Cloud Functions.</p></article>
-        <article><span>🎨</span><h3>Personalização</h3><p>Configurações de tema, cor, densidade visual e identidade básica da loja.</p></article>
-        <article><span>🧩</span><h3>Base SaaS</h3><p>Papéis de cliente, estabelecimento, entregador, admin e desenvolvedor.</p></article>
+        <article><span>🧱</span><h3>Tipos de conteúdo</h3><p>Posts, páginas, mídia, comentários, produtos e tipos customizados.</p></article>
+        <article><span>🔐</span><h3>Usuários e permissões</h3><p>Super admin, administrator, editor, merchant, courier e customer.</p></article>
+        <article><span>🎨</span><h3>Aparência</h3><p>Temas, menus, widgets e configurações visuais.</p></article>
+        <article><span>🧩</span><h3>Módulos</h3><p>Plugins simulados em JS/Firestore, incluindo MenuForge Delivery.</p></article>
+        <article><span>🛠️</span><h3>Ferramentas</h3><p>Exportação JSON, saúde do sistema, logs e manutenção.</p></article>
+        <article><span>🍽️</span><h3>Delivery</h3><p>Cardápio, pedidos, entregadores, status e rotas por GPS.</p></article>
       </div>
     </section>
 
-    <section id="menuPage" class="menu-page page-screen hidden">
+    <section id="menuView" class="menu-page page-screen hidden">
       <div id="storeHero" class="store-hero"></div>
-
       <div class="menu-layout">
         <aside id="categoryList" class="category-list"></aside>
         <section class="menu-products">
@@ -102,52 +92,12 @@
     </section>
   </main>
 
-  <section id="authModal" class="modal hidden">
-    <div class="modal-backdrop" data-close-auth></div>
-
-    <div class="auth-card">
-      <button class="close" data-close-auth type="button">×</button>
-
-      <div class="tabs">
-        <button class="active" data-auth-tab="login" type="button">Entrar</button>
-        <button data-auth-tab="register" type="button">Criar conta</button>
-      </div>
-
-      <form id="loginForm" class="auth-form">
-        <h2>Entrar no painel</h2>
-        <p class="form-help">Instalação inicial: usuário <b>admin</b> e senha <b>admin123</b>. Depois troque em Configurações.</p>
-        <label>Usuário ou e-mail <input name="email" type="text" autocomplete="username" required></label>
-        <label>Senha <input name="password" type="password" autocomplete="current-password" required></label>
-        <button class="btn primary full" type="submit">Entrar</button>
-        <button id="googleLogin" class="btn google full" type="button"><span>G</span> Entrar com Google</button>
-      </form>
-
-      <form id="registerForm" class="auth-form hidden">
-        <h2>Criar conta</h2>
-        <label>Nome completo <input name="name" autocomplete="name" required></label>
-        <label>E-mail <input name="email" type="email" autocomplete="email" required></label>
-        <label>Senha <input name="password" type="password" minlength="6" autocomplete="new-password" required></label>
-        <label>Tipo de conta
-          <select name="requestedRole">
-            <option value="merchant">Estabelecimento</option>
-            <option value="courier">Entregador</option>
-            <option value="customer">Cliente</option>
-          </select>
-        </label>
-        <button class="btn primary full" type="submit">Criar e entrar</button>
-        <button id="googleRegister" class="btn google full" type="button"><span>G</span> Continuar com Google</button>
-      </form>
-    </div>
-  </section>
-
   <aside id="cartDrawer" class="cart hidden">
     <header>
       <h2>Seu pedido</h2>
       <button id="closeCart" class="close" type="button">×</button>
     </header>
-
     <div id="cartItems" class="cart-items"></div>
-
     <footer>
       <p><span>Subtotal</span><strong id="cartSubtotal">R$ 0,00</strong></p>
       <p><span>Entrega</span><strong id="cartDelivery">R$ 0,00</strong></p>
@@ -158,11 +108,7 @@
 
   <dialog id="checkoutDialog">
     <form id="checkoutForm" method="dialog" class="dialog-card">
-      <header>
-        <h2>Entrega detalhada</h2>
-        <button class="close" value="cancel" type="submit">×</button>
-      </header>
-
+      <header><h2>Entrega detalhada</h2><button class="close" value="cancel" type="submit">×</button></header>
       <div class="form-grid">
         <label>Nome completo <input name="name" required></label>
         <label>WhatsApp <input name="phone" required></label>
@@ -171,90 +117,15 @@
         <label>Bairro <input name="district" required></label>
         <label>Complemento <input name="complement"></label>
         <label class="wide">Referência <input name="reference" placeholder="portão, cor da casa, perto de..."></label>
-        <label>Pagamento
-          <select name="payment">
-            <option>Pix</option>
-            <option>Dinheiro</option>
-            <option>Cartão na entrega</option>
-          </select>
-        </label>
+        <label>Pagamento <select name="payment"><option>Pix</option><option>Dinheiro</option><option>Cartão na entrega</option></select></label>
         <label>Troco para <input name="changeFor"></label>
         <label class="wide">Observações <textarea name="notes" rows="3"></textarea></label>
       </div>
-
-      <footer>
-        <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
-        <button class="btn primary" type="submit">Enviar pedido</button>
-      </footer>
+      <footer><button class="btn ghost" value="cancel" type="submit">Cancelar</button><button class="btn primary" type="submit">Enviar pedido</button></footer>
     </form>
   </dialog>
 
-  <section id="adminApp" class="admin-app hidden">
-    <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
-
-    <aside id="adminSidebar" class="admin-sidebar">
-      <div class="sidebar-top">
-        <a class="brand admin-brand" href="#/admin">
-          <span>MF</span>
-          <div><strong>MenuForge</strong><small id="roleLabel">painel</small></div>
-        </a>
-        <button id="closeSidebar" class="close sidebar-close" type="button">×</button>
-      </div>
-
-      <nav id="adminNav"></nav>
-
-      <div class="sidebar-actions">
-        <button id="seedDemo" class="btn soft full" type="button">Criar loja inicial</button>
-        <button id="logoutButton" class="btn danger full" type="button">Sair</button>
-      </div>
-    </aside>
-
-    <main class="admin-main">
-      <header class="admin-topbar">
-        <button id="toggleSidebar" class="icon-btn" type="button">☰</button>
-        <div>
-          <small id="workspaceLabel">Operação</small>
-          <h1 id="workspaceTitle">Painel</h1>
-        </div>
-        <button id="quickSettings" class="btn ghost" type="button">Configurar</button>
-        <button id="newProductTop" class="btn primary" type="button">+ Produto</button>
-      </header>
-
-      <section id="dashboardView" class="workspace"></section>
-      <section id="ordersView" class="workspace hidden"></section>
-      <section id="menuAdminView" class="workspace hidden"></section>
-      <section id="courierView" class="workspace hidden"></section>
-      <section id="settingsView" class="workspace hidden"></section>
-      <section id="approvalsView" class="workspace hidden"></section>
-      <section id="developerView" class="workspace hidden"></section>
-    </main>
-  </section>
-
-  <dialog id="productDialog">
-    <form id="productForm" method="dialog" class="dialog-card">
-      <header><h2>Produto</h2><button class="close" value="cancel" type="submit">×</button></header>
-      <input type="hidden" name="id">
-      <div class="form-grid">
-        <label>Nome <input name="name" required></label>
-        <label>Preço <input name="price" required></label>
-        <label>Categoria <select name="categoryId"></select></label>
-        <label>Status <select name="active"><option value="true">Ativo</option><option value="false">Oculto</option></select></label>
-        <label class="wide">Descrição <textarea name="description" rows="3"></textarea></label>
-        <label>Tempo de preparo <input name="prepTime" value="20"></label>
-        <label>Destaque <select name="featured"><option value="false">Não</option><option value="true">Sim</option></select></label>
-      </div>
-      <footer><button class="btn ghost" value="cancel" type="submit">Cancelar</button><button class="btn primary" type="submit">Salvar</button></footer>
-    </form>
-  </dialog>
-
-  <dialog id="categoryDialog">
-    <form id="categoryForm" method="dialog" class="dialog-card slim">
-      <header><h2>Categoria</h2><button class="close" value="cancel" type="submit">×</button></header>
-      <label>Nome <input name="name" required></label>
-      <footer><button class="btn primary full" type="submit">Salvar categoria</button></footer>
-    </form>
-  </dialog>
-
-  <script type="module" src="./src/app.js?v=40"></script>
+  <script type="module" src="./src/public.js?v=forgecms"></script>
 </body>
 </html>
+

@@ -1,0 +1,1 @@
+{"name":"forgecms-menuforge","version":"5.0.0","private":true,"scripts":{"serve":"npx serve .","deploy":"firebase deploy","rules":"firebase deploy --only firestore:rules"}}
