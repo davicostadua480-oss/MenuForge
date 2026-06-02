@@ -15,9 +15,12 @@ const state = {
   user: null,
   profile: null,
   stores: [],
+  categories: [],
   products: [],
   orders: [],
   users: [],
+  content: [],
+  unsubs: [],
   options: {},
   modules: null
 };
@@ -33,15 +36,41 @@ function toast(message, type = "") {
 }
 
 function showLogin() {
-  $("#boot")?.setAttribute("hidden", "");
-  $("#loginScreen")?.classList.remove("hidden");
-  $("#adminShell")?.classList.add("hidden");
+  const boot = $("#boot");
+  const login = $("#loginScreen");
+  const shell = $("#adminShell");
+
+  if (boot) boot.hidden = true;
+
+  if (login) {
+    login.classList.remove("hidden");
+    login.style.display = "grid";
+  }
+
+  if (shell) {
+    shell.classList.add("hidden");
+    shell.style.display = "none";
+  }
 }
 
 function showShell() {
-  $("#boot")?.setAttribute("hidden", "");
-  $("#loginScreen")?.classList.add("hidden");
-  $("#adminShell")?.classList.remove("hidden");
+  const boot = $("#boot");
+  const login = $("#loginScreen");
+  const shell = $("#adminShell");
+
+  if (boot) boot.hidden = true;
+
+  if (login) {
+    login.classList.add("hidden");
+    login.style.display = "none";
+  }
+
+  if (shell) {
+    shell.classList.remove("hidden");
+    shell.style.display = "grid";
+  }
+
+  window.scrollTo(0, 0);
 }
 
 function setBusy(isBusy, text = "Entrar") {
@@ -54,6 +83,52 @@ function setBusy(isBusy, text = "Entrar") {
 function loginIdentifierToEmail(value) {
   const raw = String(value || "").trim();
   return raw.toLowerCase() === "admin" ? BOOT_ADMIN_EMAIL : raw;
+}
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+function money(value) {
+  return BRL.format(Number(value || 0));
+}
+
+function slugify(value = "") {
+  return normalize(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item";
+}
+
+function toNumber(value) {
+  const n = Number(String(value || "").replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function currentStoreId() {
+  return state.activeStoreId || state.profile?.currentStoreId || state.stores[0]?.id || null;
+}
+
+function activeStore() {
+  const id = currentStoreId();
+  return state.stores.find(store => store.id === id) || state.stores[0] || null;
+}
+
+function storeCategories(storeId = currentStoreId()) {
+  return state.categories.filter(category => category.storeId === storeId);
+}
+
+function storeProducts(storeId = currentStoreId()) {
+  return state.products.filter(product => product.storeId === storeId);
+}
+
+function address(order) {
+  const a = order.address || {};
+  return [a.street, a.number, a.district, a.complement, a.reference].filter(Boolean).join(", ");
+}
+
+function mapsUrl(order) {
+  return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(address(order));
+}
+
+function panel(title, body) {
+  setTitle(title, "ForgeCMS");
+  $("#adminView").innerHTML = `<article class="panel"><h2>${title}</h2>${body}</article>`;
 }
 
 async function loadFirebase() {
@@ -150,6 +225,32 @@ async function seedCore() {
     locked: true,
     updatedAt: serverTimestamp()
   }, { merge: true });
+}
+
+function subscribeCollections() {
+  const { collection, onSnapshot } = state.modules.firestoreMod;
+
+  if (state.unsubs?.length) state.unsubs.forEach(unsub => unsub && unsub());
+  state.unsubs = [];
+
+  const listen = (collectionName, stateKey) => {
+    state.unsubs.push(onSnapshot(collection(state.db, collectionName), snapshot => {
+      state[stateKey] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      if ($("#adminShell") && !$("#adminShell").classList.contains("hidden")) {
+        route();
+      }
+    }, error => {
+      toast(collectionName + ": " + error.message, "err");
+    }));
+  };
+
+  listen("users", "users");
+  listen("cms_content", "content");
+  listen("stores", "stores");
+  listen("categories", "categories");
+  listen("products", "products");
+  listen("orders", "orders");
 }
 
 function renderNav() {
@@ -731,12 +832,12 @@ function route() {
   if (hash === "#/content") return renderContent("all");
   if (hash === "#/content-post") return renderContent("post");
   if (hash === "#/content-page") return renderContent("page");
-  if (hash === "#/media") return renderMedia ? renderMedia() : renderContent("all");
+  if (hash === "#/media") return panel("Mídia", "<p class=\"muted\">Biblioteca de mídia em preparação.</p>");
   if (hash === "#/comments") return renderComments ? renderComments() : panel("Comentários", "<p class='muted'>Comentários em preparação.</p>");
-  if (hash === "#/appearance") return renderAppearance ? renderAppearance() : panel("Aparência", "<p class='muted'>Aparência em preparação.</p>");
-  if (hash === "#/plugins") return renderPlugins ? renderPlugins() : panel("Módulos", "<p class='muted'>Módulos em preparação.</p>");
-  if (hash === "#/users") return renderUsers ? renderUsers() : panel("Usuários", "<p class='muted'>Usuários em preparação.</p>");
-  if (hash === "#/approvals") return renderApprovals ? renderApprovals() : panel("Aprovações", "<p class='muted'>Aprovações em preparação.</p>");
+  if (hash === "#/appearance") return panel("Aparência", "<p class=\"muted\">Temas, menus, widgets e paletas em preparação.</p>");
+  if (hash === "#/plugins") return panel("Módulos", "<p class=\"muted\">MenuForge Delivery, aprovações, backup, SEO e Theme Studio.</p>");
+  if (hash === "#/users") return panel("Usuários", "<p class=\"muted\">Gerenciamento de usuários e roles em preparação.</p>");
+  if (hash === "#/approvals") return panel("Aprovações", "<p class=\"muted\">Aprovação de contas pendentes em preparação.</p>");
   if (hash === "#/tools") return renderTools ? renderTools() : panel("Ferramentas", "<p class='muted'>Ferramentas em preparação.</p>");
   if (hash === "#/settings") return renderSettings();
   if (hash === "#/menuforge") return renderMenuForge();
@@ -763,6 +864,7 @@ async function enter(user, requestedRole = "merchant") {
   state.user = user;
   state.profile = await ensureProfile(user, requestedRole);
   await seedCore();
+  subscribeCollections();
 
   showShell();
   if (!location.hash || location.hash === "#") location.hash = "#/dashboard";
