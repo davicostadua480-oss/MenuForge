@@ -26,10 +26,10 @@
       <a href="#/">Início</a>
       <a href="#/cardapio/demo">Cardápio demo</a>
       <a href="#/recursos">Recursos</a>
-      <a href="./admin.html?v=ux4">Admin</a>
+      <a href="./admin.html?v=auth-arch2">Admin</a>
     </nav>
 
-    <a class="btn primary" href="./admin.html?v=ux4">Painel</a>
+    <a class="btn primary" href="./admin.html?v=auth-arch2">Painel</a>
   </header>
 
   <main id="publicRoot">
@@ -43,7 +43,7 @@
         </p>
         <div class="actions">
           <a class="btn primary big" href="#/cardapio/demo">Ver cardápio demo</a>
-          <a class="btn soft big" href="./admin.html?v=ux4">Entrar no ForgeCMS</a>
+          <a class="btn soft big" href="./admin.html?v=auth-arch2">Entrar no ForgeCMS</a>
         </div>
         <div class="metric-strip">
           <article><strong>CMS</strong><span>núcleo reutilizável</span></article>
@@ -57,7 +57,7 @@
         <div class="order-preview"><strong>Posts / Páginas</strong><span>conteúdo</span></div>
         <div class="order-preview"><strong>Produtos / Pedidos</strong><span>delivery</span></div>
         <div class="route-line"><i></i><i></i><i></i><em></em></div>
-        <a class="btn primary full" href="./admin.html?v=ux4">Acessar admin</a>
+        <a class="btn primary full" href="./admin.html?v=auth-arch2">Acessar admin</a>
       </aside>
     </section>
 
@@ -79,6 +79,7 @@
 
     <section id="menuView" class="menu-page page-screen hidden">
       <div id="storeHero" class="store-hero"></div>
+      <div id="promoArea" class="promo-area"></div>
       <div class="menu-layout">
         <aside id="categoryList" class="category-list"></aside>
         <section class="menu-products">
@@ -101,6 +102,8 @@
     <footer>
       <p><span>Subtotal</span><strong id="cartSubtotal">R$ 0,00</strong></p>
       <p><span>Entrega</span><strong id="cartDelivery">R$ 0,00</strong></p>
+      <div class="coupon-box"><input id="couponCode" placeholder="Cupom" autocomplete="off"><button id="applyCoupon" class="btn soft" type="button">Aplicar</button></div>
+      <p><span>Desconto</span><strong id="cartDiscount">R$ 0,00</strong></p>
       <p class="cart-total"><span>Total</span><strong id="cartTotal">R$ 0,00</strong></p>
       <button id="checkoutButton" class="btn primary full" type="button">Finalizar pedido</button>
     </footer>
@@ -125,7 +128,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="./src/public.js?v=checkout-courier1"></script>
+  <script type="module" src="./src/public.js?v=public-cms1"></script>
 </body>
 </html>
 

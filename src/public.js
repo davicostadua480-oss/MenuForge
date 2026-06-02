@@ -27,6 +27,19 @@ mfProductImagesCss.textContent = `
 .product-img.has-photo img{width:100%;height:100%;object-fit:cover;display:block}
 `;
 document.head.appendChild(mfProductImagesCss);
+const mfCmsBridgeCss = document.createElement("style");
+mfCmsBridgeCss.id = "mfCmsBridgeStyle";
+mfCmsBridgeCss.textContent = `
+.promo-area{display:grid;gap:10px;margin:12px 0}
+.promo-card{border:1px solid rgba(85,224,255,.28);background:linear-gradient(135deg,rgba(124,140,255,.15),rgba(85,224,255,.08));border-radius:20px;padding:14px}
+.promo-card h3{margin:.1rem 0 .25rem}
+.coupon-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.coupon-chip{border:1px dashed rgba(255,255,255,.25);border-radius:999px;padding:7px 10px;font-weight:900}
+.coupon-box{display:flex;gap:8px;margin:8px 0}
+.coupon-box input{min-width:0}
+.store-closed-warning{border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);border-radius:16px;padding:12px;margin-top:10px}
+`;
+document.head.appendChild(mfCmsBridgeCss);
 
 
 const state = {
@@ -34,10 +47,12 @@ const state = {
   stores: [],
   categories: [],
   products: [],
+  content: [],
   activeStore: null,
   menuCategory: "all",
   menuSearch: "",
   cart: JSON.parse(localStorage.getItem("mf-cart") || "[]"),
+  couponCode: localStorage.getItem("mf-coupon") || "",
   storesLoaded: false
 };
 
@@ -67,6 +82,53 @@ function productImageHtml(p,i){
     ? `<div class="product-img has-photo"><img src="${esc(p.imageUrl)}" alt="${esc(p.name || "Produto")}" loading="lazy"></div>`
     : `<div class="product-img">${productPresetEmoji(p) || ["🍔","🍕","🥤","🍟"][i%4]}</div>`;
 }
+function storeContent(store){
+  return state.content.filter(c => c.status === "published" && (!c.storeId || c.storeId === store?.id || c.storeSlug === store?.slug));
+}
+function publicBanners(store){ return storeContent(store).filter(c => c.type === "banner"); }
+function publicCoupons(store){ return storeContent(store).filter(c => c.type === "coupon"); }
+function couponCode(c){ return normalize(c.slug || c.title || "").replace(/[^a-z0-9]+/g,""); }
+function findCoupon(code){
+  const k = normalize(code || "").replace(/[^a-z0-9]+/g,"");
+  if(!k || !state.activeStore) return null;
+  return publicCoupons(state.activeStore).find(c => couponCode(c) === k) || null;
+}
+function couponDiscount(coupon, subtotal){
+  if(!coupon) return 0;
+  const raw = String(coupon.content || coupon.excerpt || coupon.title || "");
+  const m = raw.match(/(\d+(?:[,.]\d+)?)/);
+  if(!m) return 0;
+  const n = Number(m[1].replace(",", "."));
+  if(!Number.isFinite(n) || n <= 0) return 0;
+  return raw.includes("%") ? Math.min(subtotal, subtotal * n / 100) : Math.min(subtotal, n);
+}
+function isStoreOpen(store){
+  if(!store) return true;
+  if(store.status === "closed") return false;
+  if(store.status !== "auto") return true;
+  const h = store.hours || {};
+  if(!h.enabled) return true;
+  const now = new Date();
+  const day = String(now.getDay());
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const ranges = (h.days && h.days[day]) || [];
+  return ranges.some(r => {
+    const a = String(r[0] || "00:00").split(":").map(Number);
+    const b = String(r[1] || "00:00").split(":").map(Number);
+    const start = (a[0] || 0) * 60 + (a[1] || 0);
+    let end = (b[0] || 0) * 60 + (b[1] || 0);
+    if(end < start) end += 24 * 60;
+    return minutes >= start && minutes <= end;
+  });
+}
+function renderPromos(store){
+  const banners = publicBanners(store);
+  const coupons = publicCoupons(store);
+  const parts = [];
+  banners.slice(0,3).forEach(b => parts.push(`<article class="promo-card"><span class="badge ok">Promoção</span><h3>${esc(b.title)}</h3><p>${esc(b.excerpt || b.content || "")}</p></article>`));
+  if(coupons.length) parts.push(`<div class="coupon-strip">${coupons.slice(0,6).map(c => `<span class="coupon-chip">Cupom ${esc(c.slug || c.title)}</span>`).join("")}</div>`);
+  if($("#promoArea")) $("#promoArea").innerHTML = parts.join("");
+}
 
 function show(view){
   ["homeView","featuresView","menuView"].forEach(id => $("#"+id).classList.add("hidden"));
@@ -95,6 +157,7 @@ function renderMenu(){
     $("#storeHero").innerHTML = `<div class="publicMissing"><h1>Loja não encontrada</h1><p>${state.storesLoaded ? "Essa loja ainda não existe ou o link está errado." : "Carregando loja..."}</p></div>`;
     $("#categoryList").innerHTML = "";
     $("#productGrid").innerHTML = `<div class="empty">${state.storesLoaded ? "Volte ao painel e confira o slug da loja." : "Aguarde os dados carregarem."}</div>`;
+    if($("#promoArea")) $("#promoArea").innerHTML = "";
     renderCart();
     return;
   }
@@ -104,7 +167,9 @@ function renderMenu(){
   const q = normalize(state.menuSearch);
   if(q) products = products.filter(p => normalize(p.name + " " + (p.description || "")).includes(q));
 
-  $("#storeHero").innerHTML = `<h1>${esc(store.name)}</h1><p>${esc(store.headline || "Cardápio digital inteligente.")}</p><div class="badges"><span class="badge ok">${store.status === "closed" ? "Fechado" : "Aberto"}</span><span class="badge">Entrega ${money(store.deliveryFee)}</span><span class="badge">Mínimo ${money(store.minOrder)}</span></div>`;
+  const open = isStoreOpen(store);
+  $("#storeHero").innerHTML = `<h1>${esc(store.name)}</h1><p>${esc(store.headline || "Cardápio digital inteligente.")}</p><div class="badges"><span class="badge ${open ? "ok" : "warn"}">${open ? "Aberto" : "Fechado"}</span><span class="badge">Entrega ${money(store.deliveryFee)}</span><span class="badge">Mínimo ${money(store.minOrder)}</span></div>${open ? "" : `<div class="store-closed-warning">A loja está fechada agora. Você pode visualizar o cardápio, mas confirme o atendimento pelo WhatsApp.</div>`}`;
+  renderPromos(store);
   $("#categoryList").innerHTML = `<button class="cat-btn ${state.menuCategory === "all" ? "active" : ""}" data-cat="all">Tudo</button>` + categories.map(c => `<button class="cat-btn ${state.menuCategory === c.id ? "active" : ""}" data-cat="${c.id}">${esc(c.name)}</button>`).join("");
   $$("#categoryList [data-cat]").forEach(btn => btn.onclick = () => { state.menuCategory = btn.dataset.cat; renderMenu(); });
   $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card">${productImageHtml(p,i)}<div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">${p.multiFlavor ? "Escolher sabores" : "Adicionar"}</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto cadastrado nesta loja ainda.</div>`;
@@ -167,8 +232,10 @@ function addToCart(id, selectedFlavors=[]){
 }
 function cartTotals(){
   const subtotal = state.cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const coupon = findCoupon(state.couponCode);
+  const discount = couponDiscount(coupon, subtotal);
   const delivery = state.cart.length ? Number((state.activeStore || demoStore()).deliveryFee || 0) : 0;
-  return { subtotal, delivery, total:subtotal+delivery };
+  return { subtotal, discount, delivery, total:Math.max(0, subtotal - discount) + delivery, coupon };
 }
 function renderCart(){
   $("#cartCount").textContent = state.cart.reduce((s,i)=>s+i.qty,0);
@@ -178,6 +245,8 @@ function renderCart(){
   const t = cartTotals();
   $("#cartSubtotal").textContent = money(t.subtotal);
   $("#cartDelivery").textContent = money(t.delivery);
+  if($("#cartDiscount")) $("#cartDiscount").textContent = "- " + money(t.discount || 0);
+  if($("#couponCode")) $("#couponCode").value = state.couponCode || "";
   $("#cartTotal").textContent = money(t.total);
 }
 function qty(id,delta){
@@ -200,6 +269,8 @@ async function submitOrder(form){
     items: state.cart,
     subtotal: t.subtotal,
     deliveryFee: t.delivery,
+    discount: t.discount || 0,
+    coupon: t.coupon ? { id:t.coupon.id, code:t.coupon.slug || t.coupon.title, title:t.coupon.title } : null,
     total: t.total,
     status: "new",
     shortId: Math.random().toString(36).slice(2,8).toUpperCase(),
@@ -214,7 +285,7 @@ async function submitOrder(form){
     if(store.id !== "demo") await addDoc(collection(db,"orders"), order);
     state.cart = []; saveCart(); renderCart();
     $("#checkoutDialog").close(); $("#cartDrawer").classList.add("hidden");
-    if(store.whatsapp) window.open(wa(store.whatsapp, `Novo pedido #${order.shortId}\nTotal: ${money(order.total)}\nCliente: ${order.customer.name}\nEndereço: ${address(order)}\nItens: ${order.items.map(i => `${i.qty}x ${i.name}${i.flavorText ? " ("+i.flavorText+")" : ""}`).join(", ")}`), "_blank", "noopener,noreferrer");
+    if(store.whatsapp) window.open(wa(store.whatsapp, `Novo pedido #${order.shortId}\nTotal: ${money(order.total)}${order.discount ? "\nDesconto: -" + money(order.discount) : ""}${order.coupon ? "\nCupom: " + order.coupon.code : ""}\nCliente: ${order.customer.name}\nEndereço: ${address(order)}\nItens: ${order.items.map(i => `${i.qty}x ${i.name}${i.flavorText ? " ("+i.flavorText+")" : ""}`).join(", ")}`), "_blank", "noopener,noreferrer");
     toast("Pedido criado.", "ok");
   }catch(err){ toast("Erro ao criar pedido: " + err.message, "err"); }
 }
@@ -232,6 +303,13 @@ function bind(){
   $("#checkoutDialog").addEventListener("click", e => {
     if(e.target === $("#checkoutDialog")) $("#checkoutDialog").close();
   });
+  if($("#applyCoupon")) $("#applyCoupon").onclick = () => {
+    state.couponCode = ($("#couponCode").value || "").trim();
+    localStorage.setItem("mf-coupon", state.couponCode);
+    const c = findCoupon(state.couponCode);
+    renderCart();
+    toast(c ? "Cupom aplicado." : "Cupom não encontrado.", c ? "ok" : "err");
+  };
   $("#checkoutForm").onsubmit = e => { if(e.submitter?.value === "cancel") return; e.preventDefault(); submitOrder(e.currentTarget); };
   window.addEventListener("hashchange", route);
 }
@@ -239,6 +317,7 @@ function subscribe(){
   onSnapshot(collection(db,"stores"), snap => { state.stores=snap.docs.map(d=>({id:d.id,...d.data()})); state.storesLoaded=true; route(); }, err => { state.storesLoaded=true; toast("Erro ao carregar lojas: " + err.message, "err"); route(); });
   onSnapshot(collection(db,"categories"), snap => { state.categories=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); }, err => toast("Erro ao carregar categorias: " + err.message, "err"));
   onSnapshot(collection(db,"products"), snap => { state.products=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); }, err => toast("Erro ao carregar produtos: " + err.message, "err"));
+  onSnapshot(collection(db,"cms_content"), snap => { state.content=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); renderCart(); }, err => toast("Erro ao carregar conteúdo: " + err.message, "err"));
 }
 bind();
 subscribe();
