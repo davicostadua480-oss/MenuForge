@@ -331,22 +331,423 @@ function renderMenuForge() {
   };
 }
 
+
+async function saveCmsContent(data, id = null) {
+  const { collection, addDoc, doc, setDoc, serverTimestamp } = state.modules.firestoreMod;
+
+  const payload = {
+    type: data.type || "post",
+    title: data.title || "Sem título",
+    slug: data.slug || slugify(data.title || "conteudo"),
+    status: data.status || "draft",
+    excerpt: data.excerpt || "",
+    content: data.content || "",
+    authorId: state.user.uid,
+    updatedAt: serverTimestamp()
+  };
+
+  if (id) {
+    await setDoc(doc(state.db, "cms_content", id), payload, { merge: true });
+  } else {
+    await addDoc(collection(state.db, "cms_content"), {
+      ...payload,
+      createdAt: serverTimestamp()
+    });
+  }
+}
+
+function renderContent(type = "all", editingId = null) {
+  setTitle(type === "all" ? "Conteúdo" : type === "post" ? "Posts" : "Páginas", "ForgeCMS");
+
+  const editing = editingId ? state.content.find(c => c.id === editingId) : null;
+  const list = state.content.filter(c => (type === "all" || c.type === type) && c.status !== "trash");
+
+  $("#adminView").innerHTML = `
+    <div class="workspace-grid grid-2">
+      <article class="panel">
+        <div class="panel-head"><h2>${editing ? "Editar" : "Novo"} conteúdo</h2></div>
+
+        <form id="contentForm" class="stack">
+          <label>Tipo
+            <select id="contentType">
+              <option value="post">Post</option>
+              <option value="page">Página</option>
+              <option value="banner">Banner</option>
+              <option value="coupon">Cupom</option>
+            </select>
+          </label>
+
+          <label>Status
+            <select id="contentStatus">
+              <option value="draft">Rascunho</option>
+              <option value="published">Publicado</option>
+              <option value="private">Privado</option>
+            </select>
+          </label>
+
+          <label>Título <input id="contentTitle" value="${esc(editing?.title || "")}"></label>
+          <label>Slug <input id="contentSlug" value="${esc(editing?.slug || "")}"></label>
+          <label>Resumo <textarea id="contentExcerpt" rows="2">${esc(editing?.excerpt || "")}</textarea></label>
+          <label>Conteúdo <textarea id="contentBody" rows="7">${esc(editing?.content || "")}</textarea></label>
+
+          <button class="btn primary" type="submit">${editing ? "Atualizar" : "Salvar"}</button>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h2>Itens</h2><span class="badge">${list.length}</span></div>
+
+        <div class="stack">
+          ${list.map(c => `
+            <article class="content-row">
+              <div class="content-meta">
+                <span class="badge">${esc(c.type || "post")}</span>
+                <span class="badge ${c.status === "published" ? "ok" : "warn"}">${esc(c.status || "draft")}</span>
+              </div>
+              <h3>${esc(c.title || "Sem título")}</h3>
+              <p class="muted">${esc(c.excerpt || c.content || "").slice(0, 140)}</p>
+              <div class="row-actions">
+                <button class="btn soft" data-edit-content="${c.id}">Editar</button>
+                <button class="btn danger" data-trash-content="${c.id}">Lixeira</button>
+              </div>
+            </article>
+          `).join("") || "<div class='empty'>Nenhum conteúdo ainda.</div>"}
+        </div>
+      </article>
+    </div>
+  `;
+
+  if (editing) {
+    $("#contentType").value = editing.type || "post";
+    $("#contentStatus").value = editing.status || "draft";
+  }
+
+  $("#contentForm").onsubmit = async e => {
+    e.preventDefault();
+
+    await saveCmsContent({
+      type: $("#contentType").value,
+      status: $("#contentStatus").value,
+      title: $("#contentTitle").value,
+      slug: $("#contentSlug").value || slugify($("#contentTitle").value),
+      excerpt: $("#contentExcerpt").value,
+      content: $("#contentBody").value
+    }, editingId);
+
+    toast("Conteúdo salvo.", "ok");
+    renderContent(type);
+  };
+
+  $$("[data-edit-content]").forEach(btn => {
+    btn.onclick = () => renderContent(type, btn.dataset.editContent);
+  });
+
+  $$("[data-trash-content]").forEach(btn => {
+    btn.onclick = async () => {
+      const { doc, setDoc, serverTimestamp } = state.modules.firestoreMod;
+      await setDoc(doc(state.db, "cms_content", btn.dataset.trashContent), {
+        status: "trash",
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      toast("Movido para lixeira.", "ok");
+    };
+  });
+}
+
+function renderStores() {
+  setTitle("Lojas", "MenuForge");
+
+  const current = activeStore();
+
+  $("#adminView").innerHTML = `
+    <div class="workspace-grid grid-2">
+      <article class="panel">
+        <div class="panel-head"><h2>${current ? "Editar loja" : "Criar loja"}</h2></div>
+
+        <form id="storeForm" class="stack">
+          <label>Nome <input id="storeName" value="${esc(current?.name || "")}"></label>
+          <label>Slug público <input id="storeSlug" value="${esc(current?.slug || "")}"></label>
+          <label>WhatsApp <input id="storeWhatsapp" value="${esc(current?.whatsapp || "")}"></label>
+          <label>Taxa de entrega <input id="storeFee" value="${current?.deliveryFee || 0}"></label>
+          <label>Pedido mínimo <input id="storeMin" value="${current?.minOrder || 0}"></label>
+          <label>Chamada <input id="storeHeadline" value="${esc(current?.headline || "")}"></label>
+          <button class="btn primary" type="submit">Salvar loja</button>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h2>Lojas existentes</h2><span class="badge">${state.stores.length}</span></div>
+
+        <div class="stack">
+          ${state.stores.map(s => `
+            <div class="data-card">
+              <h3>${esc(s.name)}</h3>
+              <p class="muted">/${esc(s.slug || "")}</p>
+              <button class="btn soft" data-select-store="${s.id}">Selecionar</button>
+            </div>
+          `).join("") || "<div class='empty'>Nenhuma loja criada.</div>"}
+        </div>
+      </article>
+    </div>
+  `;
+
+  $("#storeForm").onsubmit = async e => {
+    e.preventDefault();
+
+    const { collection, addDoc, doc, setDoc, serverTimestamp } = state.modules.firestoreMod;
+
+    const payload = {
+      name: $("#storeName").value.trim() || "Minha loja",
+      slug: $("#storeSlug").value.trim() || slugify($("#storeName").value),
+      whatsapp: $("#storeWhatsapp").value.trim(),
+      deliveryFee: toNumber($("#storeFee").value),
+      minOrder: toNumber($("#storeMin").value),
+      headline: $("#storeHeadline").value.trim(),
+      ownerId: state.user.uid,
+      updatedAt: serverTimestamp()
+    };
+
+    if (current?.id) {
+      await setDoc(doc(state.db, "stores", current.id), payload, { merge: true });
+    } else {
+      const ref = await addDoc(collection(state.db, "stores"), {
+        ...payload,
+        status: "open",
+        createdAt: serverTimestamp()
+      });
+      state.activeStoreId = ref.id;
+      await setDoc(doc(state.db, "users", state.user.uid), {
+        currentStoreId: ref.id,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
+
+    toast("Loja salva.", "ok");
+  };
+
+  $$("[data-select-store]").forEach(btn => {
+    btn.onclick = () => {
+      state.activeStoreId = btn.dataset.selectStore;
+      renderStores();
+    };
+  });
+}
+
+function renderProducts() {
+  setTitle("Produtos", "MenuForge");
+
+  const storeId = currentStoreId();
+
+  $("#adminView").innerHTML = `
+    <div class="workspace-grid grid-2">
+      <article class="panel">
+        <div class="panel-head"><h2>Categorias</h2></div>
+
+        <form id="categoryForm" class="stack">
+          <label>Nova categoria <input id="categoryName" placeholder="Ex: Lanches"></label>
+          <button class="btn primary" type="submit">Criar categoria</button>
+        </form>
+
+        <div class="stack" style="margin-top:16px">
+          ${storeCategories(storeId).map(c => `<div class="data-card"><strong>${esc(c.name)}</strong></div>`).join("") || "<div class='empty'>Sem categorias.</div>"}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h2>Produtos</h2><span class="badge">${storeProducts(storeId).length}</span></div>
+
+        <form id="productForm" class="stack">
+          <label>Nome <input id="productName"></label>
+          <label>Preço <input id="productPrice" placeholder="29,90"></label>
+          <label>Categoria
+            <select id="productCategory">
+              ${storeCategories(storeId).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+            </select>
+          </label>
+          <label>Descrição <textarea id="productDescription" rows="3"></textarea></label>
+          <button class="btn primary" type="submit">Criar produto</button>
+        </form>
+
+        <div class="stack" style="margin-top:16px">
+          ${storeProducts(storeId).map(p => `
+            <div class="data-card">
+              <h3>${esc(p.name)}</h3>
+              <p class="muted">${money(p.price)} · ${esc(p.description || "")}</p>
+            </div>
+          `).join("") || "<div class='empty'>Sem produtos.</div>"}
+        </div>
+      </article>
+    </div>
+  `;
+
+  $("#categoryForm").onsubmit = async e => {
+    e.preventDefault();
+
+    const name = $("#categoryName").value.trim();
+    if (!name) return toast("Informe o nome da categoria.", "err");
+
+    const { collection, addDoc, serverTimestamp } = state.modules.firestoreMod;
+
+    await addDoc(collection(state.db, "categories"), {
+      storeId,
+      name,
+      order: Date.now(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    toast("Categoria criada.", "ok");
+    $("#categoryName").value = "";
+  };
+
+  $("#productForm").onsubmit = async e => {
+    e.preventDefault();
+
+    if (!storeId) return toast("Crie uma loja primeiro.", "err");
+
+    const { collection, addDoc, serverTimestamp } = state.modules.firestoreMod;
+
+    await addDoc(collection(state.db, "products"), {
+      storeId,
+      categoryId: $("#productCategory").value,
+      name: $("#productName").value.trim(),
+      price: toNumber($("#productPrice").value),
+      description: $("#productDescription").value.trim(),
+      active: true,
+      featured: false,
+      prepTime: 20,
+      emoji: "🍽️",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    toast("Produto criado.", "ok");
+    $("#productName").value = "";
+    $("#productPrice").value = "";
+    $("#productDescription").value = "";
+  };
+}
+
+function renderOrders() {
+  setTitle("Pedidos", "MenuForge");
+
+  const flow = [
+    ["new", "Novo"],
+    ["accepted", "Aceito"],
+    ["preparing", "Preparo"],
+    ["ready", "Saiu"],
+    ["delivered", "Finalizado"]
+  ];
+
+  $("#adminView").innerHTML = `
+    <div class="kanban">
+      ${flow.map(([status, label]) => `
+        <section class="kanban-col">
+          <h3>${label}</h3>
+          ${state.orders.filter(o => o.status === status).map(o => `
+            <article class="order-card">
+              <h4>#${esc(o.shortId || o.id.slice(0, 6))}</h4>
+              <p class="muted">${esc(o.customer?.name || "Cliente")} · ${money(o.total)}</p>
+              <p class="muted">${esc(address(o))}</p>
+              <div class="order-actions">
+                ${flow.map(([s, l]) => `<button class="btn ghost" data-order-status="${o.id}:${s}">${l}</button>`).join("")}
+                <a class="btn soft" target="_blank" href="${mapsUrl(o)}">GPS</a>
+              </div>
+            </article>
+          `).join("") || "<div class='empty'>Vazio</div>"}
+        </section>
+      `).join("")}
+    </div>
+  `;
+
+  $$("[data-order-status]").forEach(btn => {
+    btn.onclick = async () => {
+      const [id, status] = btn.dataset.orderStatus.split(":");
+      const { doc, setDoc, serverTimestamp } = state.modules.firestoreMod;
+
+      await setDoc(doc(state.db, "orders", id), {
+        status,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      toast("Pedido atualizado.", "ok");
+    };
+  });
+}
+
+function renderCouriers() {
+  setTitle("Entregadores", "MenuForge");
+
+  const couriers = state.users.filter(u => u.role === "courier" || u.requestedRole === "courier");
+
+  panel("Entregadores", `
+    <div class="stack">
+      ${couriers.map(u => `
+        <div class="data-card">
+          <h3>${esc(u.name || u.email)}</h3>
+          <p class="muted">${esc(u.email || "")} · ${esc(u.status || "")}</p>
+        </div>
+      `).join("") || "<div class='empty'>Nenhum entregador cadastrado.</div>"}
+    </div>
+  `);
+}
+
+function renderMenuForge() {
+  setTitle("MenuForge", "Módulo Delivery");
+
+  $("#adminView").innerHTML = `
+    <div class="workspace-grid grid-3">
+      <article class="plugin-card">
+        <h2>Lojas</h2>
+        <p>Cadastro de estabelecimentos e identidade pública.</p>
+        <button class="btn primary" data-go="#/stores">Gerenciar lojas</button>
+      </article>
+
+      <article class="plugin-card">
+        <h2>Produtos</h2>
+        <p>Cardápio, categorias, preços e status.</p>
+        <button class="btn primary" data-go="#/products">Gerenciar produtos</button>
+      </article>
+
+      <article class="plugin-card">
+        <h2>Pedidos</h2>
+        <p>Esteira de status, entrega e GPS.</p>
+        <button class="btn primary" data-go="#/orders">Abrir pedidos</button>
+      </article>
+    </div>
+  `;
+
+  $$("[data-go]").forEach(btn => btn.onclick = () => {
+    location.hash = btn.dataset.go;
+    route();
+  });
+}
+
 function route() {
   renderNav();
 
   const hash = location.hash || "#/dashboard";
 
+  if (hash === "#/content") return renderContent("all");
+  if (hash === "#/content-post") return renderContent("post");
+  if (hash === "#/content-page") return renderContent("page");
+  if (hash === "#/media") return renderMedia ? renderMedia() : renderContent("all");
+  if (hash === "#/comments") return renderComments ? renderComments() : panel("Comentários", "<p class='muted'>Comentários em preparação.</p>");
+  if (hash === "#/appearance") return renderAppearance ? renderAppearance() : panel("Aparência", "<p class='muted'>Aparência em preparação.</p>");
+  if (hash === "#/plugins") return renderPlugins ? renderPlugins() : panel("Módulos", "<p class='muted'>Módulos em preparação.</p>");
+  if (hash === "#/users") return renderUsers ? renderUsers() : panel("Usuários", "<p class='muted'>Usuários em preparação.</p>");
+  if (hash === "#/approvals") return renderApprovals ? renderApprovals() : panel("Aprovações", "<p class='muted'>Aprovações em preparação.</p>");
+  if (hash === "#/tools") return renderTools ? renderTools() : panel("Ferramentas", "<p class='muted'>Ferramentas em preparação.</p>");
   if (hash === "#/settings") return renderSettings();
   if (hash === "#/menuforge") return renderMenuForge();
-  if (hash === "#/content") return renderSimple("Conteúdo", "<h2>Conteúdo</h2><p class='muted'>Área base para posts, páginas, banners e tipos customizados.</p>");
-  if (hash === "#/media") return renderSimple("Mídia", "<h2>Mídia</h2><p class='muted'>Biblioteca de mídia do ForgeCMS.</p>");
-  if (hash === "#/appearance") return renderSimple("Aparência", "<h2>Aparência</h2><p class='muted'>Temas, menus, widgets e paletas.</p>");
-  if (hash === "#/plugins") return renderSimple("Módulos", "<h2>Módulos</h2><p class='muted'>MenuForge Delivery, aprovações, backup, SEO e Theme Studio.</p>");
-  if (hash === "#/users") return renderSimple("Usuários", "<h2>Usuários</h2><p class='muted'>Roles e permissões serão administrados aqui.</p>");
-  if (hash === "#/approvals") return renderSimple("Aprovações", "<h2>Aprovações</h2><p class='muted'>Contas pendentes de estabelecimentos e entregadores.</p>");
+  if (hash === "#/stores") return renderStores();
+  if (hash === "#/products") return renderProducts();
+  if (hash === "#/orders") return renderOrders();
+  if (hash === "#/couriers") return renderCouriers();
 
   return renderDashboard();
 }
+
 
 function openSidebar() {
   $("#sidebar")?.classList.add("open");
