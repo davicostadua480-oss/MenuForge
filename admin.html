@@ -7,7 +7,7 @@
   <meta name="description" content="ForgeCMS — CMS em Firebase inspirado no fluxo administrativo do WordPress." />
   <meta name="theme-color" content="#080d1b" />
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="./styles.css?v=admin" />
+  <link rel="stylesheet" href="./styles.css?v=admin2" />
 </head>
 <body class="admin-body">
   <div id="boot" class="boot">
@@ -191,7 +191,43 @@
     </form>
   </dialog>
 
-  <script type="module" src="./src/admin.js?v=admin"></script>
+  <script id="forgecms-boot-guard">
+    window.FORGECMS_BOOT_TIMER = setTimeout(function () {
+      var boot = document.getElementById("boot");
+      var login = document.getElementById("loginScreen");
+      var toastArea = document.getElementById("toastArea");
+
+      if (!window.FORGECMS_READY) {
+        if (boot) boot.hidden = true;
+        if (login) login.classList.remove("hidden");
+
+        if (toastArea && !document.getElementById("forgecmsBootWarning")) {
+          var warning = document.createElement("div");
+          warning.id = "forgecmsBootWarning";
+          warning.className = "toast err";
+          warning.textContent = "Modo recuperação: o painel demorou para carregar. Se o login não responder, recarregue com ?v=admin2 ou confira conexão/CDN Firebase.";
+          toastArea.appendChild(warning);
+        }
+      }
+    }, 4500);
+
+    window.addEventListener("error", function (event) {
+      var boot = document.getElementById("boot");
+      var login = document.getElementById("loginScreen");
+      if (boot) boot.hidden = true;
+      if (login) login.classList.remove("hidden");
+      console.error("ForgeCMS global error:", event.message, event.error);
+    });
+
+    window.addEventListener("unhandledrejection", function (event) {
+      var boot = document.getElementById("boot");
+      var login = document.getElementById("loginScreen");
+      if (boot) boot.hidden = true;
+      if (login) login.classList.remove("hidden");
+      console.error("ForgeCMS unhandled rejection:", event.reason);
+    });
+  </script>
+  <script type="module" src="./src/admin.js?v=admin2"></script>
 </body>
 </html>
 

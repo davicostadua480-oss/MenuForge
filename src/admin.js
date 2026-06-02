@@ -659,6 +659,8 @@ async function googleAuth(){
 }
 
 function bind(){
+  window.FORGECMS_READY = true;
+  if (window.FORGECMS_BOOT_TIMER) clearTimeout(window.FORGECMS_BOOT_TIMER);
   $("#boot").hidden = true;
   $("#loginForm").onsubmit = login;
   $("#requestForm").onsubmit = requestAccess;
@@ -681,13 +683,27 @@ function bind(){
   window.addEventListener("hashchange", route);
 }
 function init(){
-  bind();
-  onAuthStateChanged(auth, async user => {
-    if(!user){
-      state.user=null; state.profile=null; stopSubscriptions(); showLogin(); return;
-    }
-    if(!state.user) await enter(user, "merchant");
-  });
+  try{
+    bind();
+    onAuthStateChanged(auth, async user => {
+      try{
+        if(!user){
+          state.user=null; state.profile=null; stopSubscriptions(); showLogin(); return;
+        }
+        if(!state.user) await enter(user, "merchant");
+      }catch(err){
+        console.error("ForgeCMS auth state error:", err);
+        showLogin();
+        toast("Erro ao preparar painel: " + (err.message || err), "err");
+      }
+    });
+  }catch(err){
+    console.error("ForgeCMS init error:", err);
+    const boot = document.getElementById("boot");
+    const login = document.getElementById("loginScreen");
+    if(boot) boot.hidden = true;
+    if(login) login.classList.remove("hidden");
+  }
 }
 init();
 
