@@ -108,7 +108,7 @@
 
   <dialog id="checkoutDialog">
     <form id="checkoutForm" method="dialog" class="dialog-card">
-      <header><h2>Entrega detalhada</h2><button class="close" value="cancel" type="submit">×</button></header>
+      <header><h2>Entrega detalhada</h2><button class="close" value="cancel" type="button" formnovalidate data-close-checkout>×</button></header>
       <div class="form-grid">
         <label>Nome completo <input name="name" required></label>
         <label>WhatsApp <input name="phone" required></label>
@@ -121,11 +121,11 @@
         <label>Troco para <input name="changeFor"></label>
         <label class="wide">Observações <textarea name="notes" rows="3"></textarea></label>
       </div>
-      <footer><button class="btn ghost" value="cancel" type="submit">Cancelar</button><button class="btn primary" type="submit">Enviar pedido</button></footer>
+      <footer><button class="btn ghost" value="cancel" type="button" formnovalidate data-close-checkout>Cancelar</button><button class="btn primary" type="submit">Enviar pedido</button></footer>
     </form>
   </dialog>
 
-  <script type="module" src="./src/public.js?v=public2"></script>
+  <script type="module" src="./src/public.js?v=checkout-courier1"></script>
 </body>
 </html>
 

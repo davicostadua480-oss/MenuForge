@@ -220,10 +220,18 @@ async function submitOrder(form){
 }
 
 function bind(){
+  // checkout-close-force-1
   $("#menuSearch").oninput = e => { state.menuSearch = e.target.value; renderMenu(); };
   $("#openCart").onclick = () => $("#cartDrawer").classList.remove("hidden");
   $("#closeCart").onclick = () => $("#cartDrawer").classList.add("hidden");
   $("#checkoutButton").onclick = () => state.cart.length ? $("#checkoutDialog").showModal() : toast("Carrinho vazio.", "err");
+  $$("#checkoutDialog [data-close-checkout], #checkoutDialog button[value='cancel'], #checkoutDialog .close").forEach(btn => btn.onclick = e => {
+    e.preventDefault();
+    $("#checkoutDialog").close();
+  });
+  $("#checkoutDialog").addEventListener("click", e => {
+    if(e.target === $("#checkoutDialog")) $("#checkoutDialog").close();
+  });
   $("#checkoutForm").onsubmit = e => { if(e.submitter?.value === "cancel") return; e.preventDefault(); submitOrder(e.currentTarget); };
   window.addEventListener("hashchange", route);
 }
