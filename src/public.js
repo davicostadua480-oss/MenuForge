@@ -20,6 +20,13 @@ mfFlavorCss.textContent = `
 .flavor-actions .btn{flex:1}
 `;
 document.head.appendChild(mfFlavorCss);
+const mfProductImagesCss = document.createElement("style");
+mfProductImagesCss.id = "mfProductImagesStyle";
+mfProductImagesCss.textContent = `
+.product-img.has-photo{padding:0;overflow:hidden;background:#10192d}
+.product-img.has-photo img{width:100%;height:100%;object-fit:cover;display:block}
+`;
+document.head.appendChild(mfProductImagesCss);
 
 
 const state = {
@@ -50,6 +57,16 @@ function demoProducts(){ return [
 ];}
 function storeCategories(storeId){ const list=state.categories.filter(c=>c.storeId===storeId); return list.length ? list : storeId==="demo" ? demoCategories() : []; }
 function storeProducts(storeId){ const list=state.products.filter(p=>p.storeId===storeId); return storeId==="demo" ? demoProducts() : list; }
+function productPresetEmoji(p){
+  const key = String(p?.imagePreset || "").toLowerCase();
+  const map = { burger:"🍔", pizza:"🍕", drink:"🥤", fries:"🍟", sushi:"🍣", dessert:"🍰", salad:"🥗", acai:"🫐", coffee:"☕", plate:"🍽️" };
+  return map[key] || p?.emoji || "🍽️";
+}
+function productImageHtml(p,i){
+  return p?.imageUrl
+    ? `<div class="product-img has-photo"><img src="${esc(p.imageUrl)}" alt="${esc(p.name || "Produto")}" loading="lazy"></div>`
+    : `<div class="product-img">${productPresetEmoji(p) || ["🍔","🍕","🥤","🍟"][i%4]}</div>`;
+}
 
 function show(view){
   ["homeView","featuresView","menuView"].forEach(id => $("#"+id).classList.add("hidden"));
@@ -90,7 +107,7 @@ function renderMenu(){
   $("#storeHero").innerHTML = `<h1>${esc(store.name)}</h1><p>${esc(store.headline || "Cardápio digital inteligente.")}</p><div class="badges"><span class="badge ok">${store.status === "closed" ? "Fechado" : "Aberto"}</span><span class="badge">Entrega ${money(store.deliveryFee)}</span><span class="badge">Mínimo ${money(store.minOrder)}</span></div>`;
   $("#categoryList").innerHTML = `<button class="cat-btn ${state.menuCategory === "all" ? "active" : ""}" data-cat="all">Tudo</button>` + categories.map(c => `<button class="cat-btn ${state.menuCategory === c.id ? "active" : ""}" data-cat="${c.id}">${esc(c.name)}</button>`).join("");
   $$("#categoryList [data-cat]").forEach(btn => btn.onclick = () => { state.menuCategory = btn.dataset.cat; renderMenu(); });
-  $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card"><div class="product-img">${p.emoji || ["🍔","🍕","🥤","🍟"][i%4]}</div><div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">${p.multiFlavor ? "Escolher sabores" : "Adicionar"}</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto cadastrado nesta loja ainda.</div>`;
+  $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card">${productImageHtml(p,i)}<div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">${p.multiFlavor ? "Escolher sabores" : "Adicionar"}</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto cadastrado nesta loja ainda.</div>`;
   $$("[data-add]").forEach(btn => btn.onclick = () => {
     const product = storeProducts((state.activeStore || demoStore()).id).find(p => p.id === btn.dataset.add);
     if(product?.multiFlavor) return showFlavorPicker(product);
