@@ -213,6 +213,30 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}input,select,tex
   .sideHead .logo small{max-width:145px!important}
 }
 
+
+/* forgecms-users-admin-v1 */
+.userToolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:14px 0}
+.userToolbar label{min-width:150px;flex:1}
+.userStats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+.userCardGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.userCard{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.045),transparent),var(--panel);border-radius:20px;padding:14px;display:grid;gap:10px}
+.userCard.approved{border-color:rgba(34,197,94,.35)}
+.userCard.pending{border-color:rgba(245,158,11,.42)}
+.userCard.suspended{border-color:rgba(239,68,68,.42)}
+.userAvatar{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--p),var(--p2));font-weight:1000;color:white;box-shadow:0 12px 32px rgba(85,224,255,.16);flex:0 0 44px}
+.userLine{display:flex;gap:11px;align-items:center;min-width:0}
+.userLine b,.userLine span{overflow:hidden;text-overflow:ellipsis}
+.userMeta{color:var(--muted);font-size:13px;line-height:1.45;overflow:hidden;text-overflow:ellipsis}
+.userActions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.userActions .btn{min-width:0}
+.userTable{width:100%;border-collapse:collapse;min-width:780px}
+.userTable th,.userTable td{border-bottom:1px solid var(--line);padding:11px;text-align:left;vertical-align:top}
+.userTable th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.userMiniForm{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.userMiniForm .full{grid-column:1/-1}
+.userStorePill{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(85,224,255,.22);background:rgba(85,224,255,.07);border-radius:999px;padding:5px 8px;color:var(--p2);font-size:12px;font-weight:900}
+@media(max-width:850px){.userStats{grid-template-columns:1fr 1fr}.userCardGrid{grid-template-columns:1fr}.userActions{grid-template-columns:1fr}.userMiniForm{grid-template-columns:1fr}.userToolbar label,.userToolbar .btn{width:100%}}
+
 </style>
 <script>
 window.__lastErrorToast="";
@@ -837,7 +861,119 @@ function media(){title("Mídia");view('<div class="grid g2"><article class="pane
 function applyTheme(){var a=st.options.appearance||JSON.parse(localStorage.fcTheme||"{}");document.body.classList.toggle("light",a.mode==="light");["warm","forest","royal"].forEach(function(x){document.body.classList.remove(x)});if(a.palette&&a.palette!=="default")document.body.classList.add(a.palette)}
 function appearance(){title("Aparência");view('<div class="grid g2"><article class="panel"><h2>Tema</h2><label>Modo<select id="mode"><option value="dark">Escuro</option><option value="light">Claro</option></select></label><p class="muted">Paleta</p><div class="row"><button class="dot d-default" data-pal="default"></button><button class="dot d-warm" data-pal="warm"></button><button class="dot d-forest" data-pal="forest"></button><button class="dot d-royal" data-pal="royal"></button></div></article><article class="panel"><h2>Menus e widgets</h2><p class="muted">Base para temas, menus públicos, blocos e widgets.</p></article></div>');$("#mode").value=(st.options.appearance&&st.options.appearance.mode)||"dark";$$("[data-pal]").forEach(function(b){b.onclick=function(){var data={mode:$("#mode").value,palette:b.dataset.pal,updatedAt:ts()};localStorage.fcTheme=JSON.stringify(data);st.db.collection("cms_options").doc("appearance").set(data,{merge:true}).then(function(){applyTheme();toast("Tema salvo.","ok")})}})}
 function plugins(){title("Módulos");var defs=["MenuForge Delivery","Aprovação de contas","Backup JSON","SEO básico","Theme Studio"];view('<div class="grid g3">'+defs.map(function(x){return '<article class="card"><span class="badge ok">Ativo</span><h2>'+x+'</h2><p class="muted">Módulo do ForgeCMS.</p></article>'}).join("")+'</div>')}
-function users(){title("Usuários");view('<article class="panel"><div class="scroll"><table class="table"><thead><tr><th>Nome</th><th>E-mail</th><th>Role</th><th>Status</th></tr></thead><tbody>'+st.users.map(function(u){return '<tr><td>'+esc(u.name)+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.role)+'</td><td>'+esc(u.status)+'</td></tr>'}).join("")+'</tbody></table></div></article>')}
+function userRoleLabel(role){
+  var map={super_admin:"Super admin",admin:"Admin",merchant:"Estabelecimento",editor:"Editor",courier:"Entregador",customer:"Cliente",pending:"Pendente"};
+  return map[role]||role||"Pendente";
+}
+function userStatusLabel(status){
+  var map={approved:"Aprovado",pending:"Pendente",suspended:"Suspenso",active:"Ativo",busy:"Em entrega",paused:"Pausado",offline:"Offline"};
+  return map[status]||status||"Pendente";
+}
+function userStatusClass(status){
+  if(status==="approved"||status==="active")return "approved";
+  if(status==="suspended"||status==="offline")return "suspended";
+  return "pending";
+}
+function userInitials(u){
+  var src=String((u&&u.name)||(u&&u.email)||"U").trim();
+  var parts=src.split(/\s+/).filter(Boolean);
+  return (parts[0]&&parts[0][0]||"U").toUpperCase()+(parts[1]&&parts[1][0]?parts[1][0].toUpperCase():"");
+}
+function userStoreName(id){
+  if(!id)return "Sem loja";
+  var s=st.stores.find(function(x){return x.id===id});
+  return s?s.name:"Loja removida";
+}
+function userCanEditTarget(u){
+  if(!u)return false;
+  if(isOwner(st.user))return true;
+  if(role()!=="super_admin"&&role()!=="admin")return false;
+  return u.role!=="super_admin";
+}
+function updateUserDoc(id,payload){
+  payload.updatedAt=ts();
+  return st.db.collection("users").doc(id).set(payload,{merge:true});
+}
+function deleteUserDoc(id){
+  return st.db.collection("users").doc(id).delete();
+}
+function users(){
+  title("Usuários","Sistema");
+
+  var q=String(sessionStorage.fcUserSearch||"");
+  var roleFilter=String(sessionStorage.fcUserRole||"all");
+  var statusFilter=String(sessionStorage.fcUserStatus||"all");
+  var storeFilter=String(sessionStorage.fcUserStore||"all");
+
+  var all=st.users.slice().sort(function(a,b){
+    var ar=a.role==="super_admin"?0:a.status==="pending"?1:2;
+    var br=b.role==="super_admin"?0:b.status==="pending"?1:2;
+    if(ar!==br)return ar-br;
+    return String(a.name||a.email||"").localeCompare(String(b.name||b.email||""));
+  });
+
+  function matches(u){
+    var hay=[u.name,u.email,u.role,u.status,u.requestedRole,u.phone,u.whatsapp,userStoreName(u.currentStoreId)].join(" ").toLowerCase();
+    if(q&&hay.indexOf(q.toLowerCase())<0)return false;
+    if(roleFilter!=="all"&&String(u.role||"pending")!==roleFilter)return false;
+    if(statusFilter!=="all"&&String(u.status||"pending")!==statusFilter)return false;
+    if(storeFilter!=="all"&&String(u.currentStoreId||"")!==storeFilter)return false;
+    return true;
+  }
+
+  var list=all.filter(matches);
+  var pending=all.filter(function(u){return u.status==="pending"||u.role==="pending"}).length;
+  var approved=all.filter(function(u){return u.status==="approved"||u.status==="active"}).length;
+  var couriers=all.filter(function(u){return u.role==="courier"||u.requestedRole==="courier"}).length;
+  var merchants=all.filter(function(u){return u.role==="merchant"||u.requestedRole==="merchant"}).length;
+
+  var roleOptions=[["all","Todos"],["super_admin","Super admin"],["admin","Admin"],["merchant","Estabelecimento"],["editor","Editor"],["courier","Entregador"],["customer","Cliente"],["pending","Pendente"]];
+  var statusOptions=[["all","Todos"],["approved","Aprovado"],["pending","Pendente"],["suspended","Suspenso"],["active","Ativo"],["busy","Em entrega"],["paused","Pausado"],["offline","Offline"]];
+  var storeOptions=[["all","Todas"]].concat(st.stores.map(function(s){return [s.id,s.name]}));
+
+  function optHtml(arr,selected){
+    return arr.map(function(o){return '<option value="'+esc(o[0])+'" '+(String(selected)===String(o[0])?'selected':'')+'>'+esc(o[1])+'</option>'}).join("");
+  }
+
+  function userRow(u){
+    var editable=userCanEditTarget(u);
+    var cls=userStatusClass(u.status);
+    var storeName=userStoreName(u.currentStoreId);
+    return `<article class="userCard ${cls}"><div class="userLine"><div class="userAvatar">${esc(userInitials(u))}</div><div style="min-width:0"><b>${esc(u.name||"Sem nome")}</b><div class="userMeta">${esc(u.email||"Sem e-mail")}</div></div></div><div class="row"><span class="badge">${esc(userRoleLabel(u.role||"pending"))}</span><span class="badge ${cls==="approved"?"ok":cls==="suspended"?"warn":"warn"}">${esc(userStatusLabel(u.status||"pending"))}</span></div><div class="userMeta">Solicitou: ${esc(userRoleLabel(u.requestedRole||u.role||"pending"))}<br>Telefone: ${esc(u.phone||u.whatsapp||"—")}<br><span class="userStorePill">Loja: ${esc(storeName)}</span></div><div class="userActions"><button class="btn soft" data-edit-user="${esc(u.id)}" type="button" ${editable?"":"disabled"}>Editar</button><button class="btn soft" data-approve-user="${esc(u.id)}" type="button" ${editable?"":"disabled"}>Aprovar</button><button class="btn soft" data-suspend-user="${esc(u.id)}" type="button" ${editable?"":"disabled"}>Suspender</button><button class="btn soft" data-role-user="${esc(u.id)}" type="button" ${editable?"":"disabled"}>Cargo</button><button class="btn soft" data-store-user="${esc(u.id)}" type="button" ${editable?"":"disabled"}>Loja</button><button class="btn destructiveMini" data-delete-user="${esc(u.id)}" type="button" ${editable&&u.uid!==st.user.uid?"":"disabled"}>Excluir</button></div></article>`;
+  }
+
+  view(`<div class="moduleHero"><div class="head"><div><h2 style="margin:0">Central de Usuários</h2><p class="muted" style="margin:.35rem 0 0">Gerencie acesso, cargos, aprovação, suspensão, entregadores, estabelecimentos e vínculo com loja.</p></div><span class="badge ok">Controle operacional</span></div></div><div class="userStats">${metric("Total",all.length)+metric("Aprovados",approved)+metric("Pendentes",pending)+metric("Entregadores",couriers)}</div><div class="grid g2"><article class="panel"><h2>Criar perfil manual</h2><form id="userCreateForm" class="stack"><div class="userMiniForm"><label>Nome<input name="name" placeholder="Nome do usuário"></label><label>E-mail<input name="email" type="email" placeholder="email@exemplo.com"></label><label>Telefone<input name="phone" placeholder="554999999999"></label><label>Cargo<select name="role">${optHtml(roleOptions.filter(function(o){return o[0]!=="all"}),"merchant")}</select></label><label>Status<select name="status">${optHtml(statusOptions.filter(function(o){return o[0]!=="all"}),"approved")}</select></label><label>Loja vinculada<select name="currentStoreId">${optHtml([["","Sem loja"]].concat(st.stores.map(function(s){return [s.id,s.name]})),"")}</select></label><label class="full">Observação<textarea name="notes" rows="3" placeholder="Ex: dono da loja, operador, caixa, entregador fixo..."></textarea></label></div><button class="btn primary" type="submit">Criar perfil</button><p class="muted">Isso cria/edita o documento em users. Para login real com senha, o usuário ainda precisa criar conta pelo formulário de acesso ou Firebase Auth.</p></form></article><article class="panel"><h2>Ações rápidas</h2><div class="stack"><button class="btn soft" data-filter-pending type="button">Ver pendentes</button><button class="btn soft" data-filter-couriers type="button">Ver entregadores</button><button class="btn soft" data-filter-merchants type="button">Ver estabelecimentos</button><button class="btn soft" data-clear-user-filters type="button">Limpar filtros</button><button class="btn primary" data-go-approvals type="button">Ir para Aprovações</button></div></article></div><article class="panel" style="margin-top:14px"><div class="head"><div><h2>Usuários cadastrados</h2><p class="muted" style="margin:.25rem 0 0">${list.length} de ${all.length} exibidos · ${merchants} estabelecimentos</p></div><span class="badge">${list.length}</span></div><div class="userToolbar"><label>Buscar<input id="userSearch" value="${esc(q)}" placeholder="Nome, e-mail, telefone, loja..."></label><label>Cargo<select id="userRoleFilter">${optHtml(roleOptions,roleFilter)}</select></label><label>Status<select id="userStatusFilter">${optHtml(statusOptions,statusFilter)}</select></label><label>Loja<select id="userStoreFilter">${optHtml(storeOptions,storeFilter)}</select></label></div><div class="userCardGrid">${list.map(userRow).join("")||'<div class="empty">Nenhum usuário encontrado.</div>'}</div><div class="scroll" style="margin-top:14px"><table class="userTable"><thead><tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Status</th><th>Loja</th></tr></thead><tbody>${list.map(function(u){return `<tr><td>${esc(u.name||"Sem nome")}</td><td>${esc(u.email||"—")}</td><td>${esc(userRoleLabel(u.role||"pending"))}</td><td>${esc(userStatusLabel(u.status||"pending"))}</td><td>${esc(userStoreName(u.currentStoreId))}</td></tr>`}).join("")||'<tr><td colspan="5"><div class="empty">Nenhum usuário.</div></td></tr>'}</tbody></table></div></article>`);
+
+  $("#userSearch").oninput=function(){sessionStorage.fcUserSearch=this.value;users()};
+  $("#userRoleFilter").onchange=function(){sessionStorage.fcUserRole=this.value;users()};
+  $("#userStatusFilter").onchange=function(){sessionStorage.fcUserStatus=this.value;users()};
+  $("#userStoreFilter").onchange=function(){sessionStorage.fcUserStore=this.value;users()};
+
+  $("[data-filter-pending]").onclick=function(){sessionStorage.fcUserStatus="pending";sessionStorage.fcUserRole="all";users()};
+  $("[data-filter-couriers]").onclick=function(){sessionStorage.fcUserRole="courier";sessionStorage.fcUserStatus="all";users()};
+  $("[data-filter-merchants]").onclick=function(){sessionStorage.fcUserRole="merchant";sessionStorage.fcUserStatus="all";users()};
+  $("[data-clear-user-filters]").onclick=function(){sessionStorage.removeItem("fcUserSearch");sessionStorage.removeItem("fcUserRole");sessionStorage.removeItem("fcUserStatus");sessionStorage.removeItem("fcUserStore");users()};
+  $("[data-go-approvals]").onclick=function(){location.hash="#/approvals";route()};
+
+  $("#userCreateForm").onsubmit=function(e){
+    e.preventDefault();
+    var f=new FormData(e.currentTarget);
+    var email=String(f.get("email")||"").trim().toLowerCase();
+    var name=String(f.get("name")||"").trim();
+    if(!email&&!name)return toast("Informe pelo menos nome ou e-mail.","err");
+    var existing=st.users.find(function(u){return email&&String(u.email||"").toLowerCase()===email});
+    var ref=existing?st.db.collection("users").doc(existing.id):st.db.collection("users").doc();
+    var roleValue=String(f.get("role")||"merchant");
+    ref.set({name:name||email.split("@")[0]||"Usuário",email:email,phone:String(f.get("phone")||"").trim(),whatsapp:String(f.get("phone")||"").trim(),role:roleValue,requestedRole:roleValue,status:String(f.get("status")||"approved"),currentStoreId:String(f.get("currentStoreId")||""),notes:String(f.get("notes")||""),createdBy:st.user.uid,createdAt:existing?(existing.createdAt||ts()):ts(),updatedAt:ts()},{merge:true}).then(function(){toast(existing?"Perfil atualizado.":"Perfil criado.","ok");e.currentTarget.reset()}).catch(function(err){toast("Erro ao criar usuário: "+(err.message||err),"err")});
+  };
+
+  $$("[data-approve-user]").forEach(function(btn){btn.onclick=function(){var u=st.users.find(function(x){return x.id===btn.dataset.approveUser});if(!u)return;var roleValue=u.requestedRole&&u.requestedRole!=="pending"?u.requestedRole:(u.role&&u.role!=="pending"?u.role:"merchant");updateUserDoc(u.id,{role:roleValue,status:roleValue==="courier"?"active":"approved",approvedBy:st.user.uid,approvedAt:ts()}).then(function(){toast("Usuário aprovado.","ok")}).catch(function(err){toast(err.message,"err")})}});
+  $$("[data-suspend-user]").forEach(function(btn){btn.onclick=function(){var u=st.users.find(function(x){return x.id===btn.dataset.suspendUser});if(!u)return;if(u.uid===st.user.uid)return toast("Você não pode suspender a própria sessão.","err");updateUserDoc(u.id,{status:"suspended",suspendedBy:st.user.uid,suspendedAt:ts()}).then(function(){toast("Usuário suspenso.","ok")}).catch(function(err){toast(err.message,"err")})}});
+  $$("[data-role-user]").forEach(function(btn){btn.onclick=function(){var u=st.users.find(function(x){return x.id===btn.dataset.roleUser});if(!u)return;var r=prompt("Novo cargo: super_admin, admin, merchant, editor, courier, customer, pending",u.role||"pending");if(r===null)return;r=String(r||"pending").trim();var valid=["super_admin","admin","merchant","editor","courier","customer","pending"];if(valid.indexOf(r)<0)return toast("Cargo inválido.","err");if(r==="super_admin"&&!isOwner(st.user))return toast("Só o owner pode promover super_admin.","err");updateUserDoc(u.id,{role:r,requestedRole:r,status:r==="courier"?"active":r==="pending"?"pending":"approved"}).then(function(){toast("Cargo atualizado.","ok")}).catch(function(err){toast(err.message,"err")})}});
+  $$("[data-store-user]").forEach(function(btn){btn.onclick=function(){var u=st.users.find(function(x){return x.id===btn.dataset.storeUser});if(!u)return;var options=st.stores.map(function(s){return s.name+" = "+s.id}).join("\n");var id=prompt("Cole o ID da loja para vincular. Vazio remove vínculo.\n\n"+options,u.currentStoreId||"");if(id===null)return;id=String(id||"").trim();if(id&& !st.stores.find(function(s){return s.id===id}))return toast("Loja não encontrada.","err");updateUserDoc(u.id,{currentStoreId:id}).then(function(){toast("Loja vinculada.","ok")}).catch(function(err){toast(err.message,"err")})}});
+  $$("[data-edit-user]").forEach(function(btn){btn.onclick=function(){var u=st.users.find(function(x){return x.id===btn.dataset.editUser});if(!u)return;var name=prompt("Nome:",u.name||"");if(name===null)return;var phone=prompt("Telefone/WhatsApp:",u.phone||u.whatsapp||"");if(phone===null)return;var notes=prompt("Observações:",u.notes||"");if(notes===null)return;updateUserDoc(u.id,{name:name,phone:phone,whatsapp:phone,notes:notes}).then(function(){toast("Usuário atualizado.","ok")}).catch(function(err){toast(err.message,"err")})}});
+  $$("[data-delete-user]").forEach(function(btn){btn.onclick=function(){var u=st.users.find(function(x){return x.id===btn.dataset.deleteUser});if(!u)return;if(u.uid===st.user.uid)return toast("Você não pode excluir o próprio perfil.","err");if(!confirm("Excluir o perfil de '"+(u.name||u.email||"usuário")+"'? Isso remove apenas o documento users, não a conta Auth."))return;deleteUserDoc(u.id).then(function(){toast("Perfil removido.","ok")}).catch(function(err){toast(err.message,"err")})}});
+}
 function approvals(){title("Aprovações");var list=st.users.filter(function(u){return u.status==="pending"||u.role==="pending"});view('<article class="panel"><h2>Pendentes</h2><div class="stack">'+(list.map(function(u){return '<div class="data"><h3>'+esc(u.name||u.email)+'</h3><p class="muted">'+esc(u.email)+' · '+esc(u.requestedRole)+'</p><div class="row"><button class="btn primary" data-ap="'+u.id+':'+(u.requestedRole||"merchant")+'">Aprovar</button><button class="btn danger" data-rj="'+u.id+'">Rejeitar</button></div></div>'}).join("")||'<div class="empty">Nada pendente.</div>')+'</div></article>');$$("[data-ap]").forEach(function(b){b.onclick=function(){var p=b.dataset.ap.split(":");st.db.collection("users").doc(p[0]).set({role:p[1],status:"approved",updatedAt:ts()},{merge:true}).then(function(){toast("Aprovado.","ok")})}});$$("[data-rj]").forEach(function(b){b.onclick=function(){st.db.collection("users").doc(b.dataset.rj).set({status:"rejected",updatedAt:ts()},{merge:true})}})}
 function settings(){title("Configurações");view('<div class="grid g2"><article class="panel"><h2>Geral</h2><form id="generalForm" class="stack"><label>Título<input name="siteTitle" value="'+esc((st.options.general&&st.options.general.siteTitle)||"MenuForge")+'"></label><label>Descrição<input name="tagline" value="'+esc((st.options.general&&st.options.general.tagline)||"Cardápio digital com ForgeCMS")+'"></label><button class="btn primary">Salvar</button></form></article><article class="panel"><h2>Segurança</h2><form id="secForm" class="stack"><label>Novo e-mail<input name="email" type="email"></label><label>Nova senha<input name="pass" type="password" minlength="6"></label><button class="btn primary">Atualizar credenciais</button></form></article></div>');$("#generalForm").onsubmit=function(e){e.preventDefault();var form=e.currentTarget;var f=new FormData(form);st.db.collection("cms_options").doc("general").set({siteTitle:f.get("siteTitle"),tagline:f.get("tagline"),updatedAt:ts()},{merge:true}).then(function(){toast("Configurações salvas.","ok")})};$("#secForm").onsubmit=function(e){e.preventDefault();var form=e.currentTarget;var f=new FormData(form);var p=Promise.resolve();if(f.get("email"))p=p.then(function(){return st.auth.currentUser.updateEmail(f.get("email"))});if(f.get("pass"))p=p.then(function(){return st.auth.currentUser.updatePassword(f.get("pass"))});p.then(function(){toast("Credenciais atualizadas.","ok")}).catch(function(err){toast(err.message,"err")})}}
 function stores(){
