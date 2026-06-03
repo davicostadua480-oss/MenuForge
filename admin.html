@@ -164,7 +164,7 @@ function slug(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\
 function num(v){var n=Number(String(v||"").replace(/\./g,"").replace(",","."));return isFinite(n)?n:0}
 function money(v){return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v||0))}
 function role(){return st.profile&&st.profile.role?st.profile.role:"pending"}
-function isOwner(u){u=u||st.user;return u&&[OWNER,BOOT_EMAIL,LEGACY_BOOT_EMAIL].indexOf(u.email)>=0}
+function isOwner(u){u=u||st.user;return !!(u&&[OWNER,BOOT_EMAIL,LEGACY_BOOT_EMAIL].indexOf(u.email)>=0)}
 
 function showLogin(){st.unsubs.forEach(function(u){try{u()}catch(e){}});st.unsubs=[];$("#login").style.display="grid";$("#login").classList.remove("hidden");$("#shell").style.display="none";$("#shell").classList.add("hidden");scrollTo(0,0)}
 function showShell(){applyTheme();$("#login").style.display="none";$("#login").classList.add("hidden");$("#shell").style.display="grid";$("#shell").classList.remove("hidden");scrollTo(0,0)}
@@ -225,13 +225,35 @@ function opt(){st.options={};st.optList.forEach(function(o){st.options[o.id]=o})
 function niceAuthError(err){
   var code=(err&&err.code)||"";
   var msg=(err&&err.message)||"";
-  if(code==="auth/invalid-credential"||code==="auth/invalid-login-credentials"||code==="auth/wrong-password"||code==="auth/user-not-found") return "Usuário ou senha incorretos.";
-  if(code==="auth/too-many-requests") return "Muitas tentativas. Aguarde um pouco e tente novamente.";
-  if(code==="auth/network-request-failed") return "Falha de conexão. Verifique a internet e tente novamente.";
-  if(code==="auth/invalid-email") return "E-mail inválido.";
-  if(code==="auth/operation-not-allowed") return "Login por e-mail/senha está desativado no Firebase Authentication.";
-  if(code==="auth/web-storage-unsupported") return "O navegador bloqueou armazenamento local. Tente outro navegador ou desative modo privado.";
-  if(code) return "Erro no login: "+code+(msg?" — "+msg:"");
+
+  if(code==="auth/invalid-credential"||code==="auth/invalid-login-credentials"||code==="auth/wrong-password"||code==="auth/user-not-found"){
+    return "Usuário ou senha incorretos.";
+  }
+
+  if(code==="auth/too-many-requests"){
+    return "Muitas tentativas. Aguarde um pouco e tente novamente.";
+  }
+
+  if(code==="auth/network-request-failed"){
+    return "Falha de conexão. Verifique a internet e tente novamente.";
+  }
+
+  if(code==="auth/invalid-email"){
+    return "E-mail inválido.";
+  }
+
+  if(code==="auth/operation-not-allowed"){
+    return "Login por e-mail/senha está desativado no Firebase Authentication.";
+  }
+
+  if(code==="auth/web-storage-unsupported"){
+    return "O navegador bloqueou armazenamento local. Tente outro navegador ou desative modo privado.";
+  }
+
+  if(code){
+    return "Erro no login: "+code+(msg?" — "+msg:"");
+  }
+
   return "Erro no login: "+(msg||"falha desconhecida.");
 }
 
@@ -240,37 +262,49 @@ var activeLogin=false;
 var panelUid=null;
 
 function setAuthPersistence(){
-  if(!st.auth) return Promise.resolve();
-  return st.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(e){
-    console.warn("Persistência local indisponível", e);
+  if(!st.auth){
+    return Promise.resolve();
+  }
+
+  return st.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(err){
+    console.warn("Persistência local indisponível:",err);
   });
 }
 
 function signInBootAdmin(pass){
   function tryEmail(email){
-    return st.auth.signInWithEmailAndPassword(email, pass);
+    return st.auth.signInWithEmailAndPassword(email,pass);
   }
 
   return tryEmail(BOOT_EMAIL).catch(function(primaryErr){
     return tryEmail(LEGACY_BOOT_EMAIL).catch(function(legacyErr){
       if(pass===BOOT_PASS){
-        return st.auth.createUserWithEmailAndPassword(BOOT_EMAIL, BOOT_PASS)
+        return st.auth.createUserWithEmailAndPassword(BOOT_EMAIL,BOOT_PASS)
           .then(function(cred){
-            return cred.user.updateProfile({displayName:"Administrador"}).then(function(){return cred});
+            return cred.user.updateProfile({displayName:"Administrador"}).then(function(){
+              return cred;
+            });
           })
           .catch(function(createErr){
-            if(createErr.code==="auth/email-already-in-use") return tryEmail(BOOT_EMAIL);
+            if(createErr.code==="auth/email-already-in-use"){
+              return tryEmail(BOOT_EMAIL);
+            }
+
             throw createErr;
           });
       }
-      throw primaryErr || legacyErr;
+
+      throw primaryErr||legacyErr;
     });
   });
 }
 
-function enterPanel(user, source){
-  if(!user) return Promise.reject(new Error("Usuário ausente."));
-  if(panelUid===user.uid && !$("#shell").classList.contains("hidden")){
+function enterPanel(user,source){
+  if(!user){
+    return Promise.reject(new Error("Usuário ausente."));
+  }
+
+  if(panelUid===user.uid&&!$("#shell").classList.contains("hidden")){
     return Promise.resolve();
   }
 
@@ -279,13 +313,18 @@ function enterPanel(user, source){
 
   return ensureProfile(user).then(function(profile){
     st.profile=profile;
+
     return seed().catch(function(seedErr){
-      console.warn("Seed não bloqueante falhou", seedErr);
+      console.warn("Seed não bloqueante falhou:",seedErr);
     });
   }).then(function(){
     subscribe();
     showShell();
-    if(!location.hash||location.hash==="#") location.hash="#/dashboard";
+
+    if(!location.hash||location.hash==="#"){
+      location.hash="#/dashboard";
+    }
+
     route(false);
   });
 }
@@ -294,7 +333,11 @@ function doLogin(){
   var f=new FormData($("#loginForm"));
   var id=String(f.get("identifier")||"").trim();
   var pass=String(f.get("password")||"");
-  if(!id||!pass){toast("Preencha usuário e senha.","err");return}
+
+  if(!id||!pass){
+    toast("Preencha usuário e senha.","err");
+    return;
+  }
 
   activeLogin=true;
   busy(true,"Entrando...");
@@ -303,18 +346,22 @@ function doLogin(){
     .then(setAuthPersistence)
     .then(function(){
       var login=id.toLowerCase();
-      if(login==="admin") return signInBootAdmin(pass);
-      return st.auth.signInWithEmailAndPassword(login, pass);
+
+      if(login==="admin"){
+        return signInBootAdmin(pass);
+      }
+
+      return st.auth.signInWithEmailAndPassword(login,pass);
     })
     .then(function(cred){
-      return enterPanel(cred.user, "active");
+      return enterPanel(cred.user,"active");
     })
     .then(function(){
       toast("Login realizado.","ok");
     })
     .catch(function(err){
-      console.error("LOGIN_ERROR", err);
-      toast(niceAuthError(err), "err");
+      console.error("LOGIN_ERROR:",err);
+      toast(niceAuthError(err),"err");
     })
     .finally(function(){
       activeLogin=false;
@@ -325,38 +372,51 @@ function doLogin(){
 function requestAccess(){
   var f=new FormData($("#reqForm"));
   busy(true,"Criando...");
+
   initFirebase()
     .then(setAuthPersistence)
     .then(function(){
       return st.auth.createUserWithEmailAndPassword(f.get("email"),f.get("password"));
     })
     .then(function(cred){
-      return cred.user.updateProfile({displayName:f.get("name")}).then(function(){return cred});
+      return cred.user.updateProfile({displayName:f.get("name")}).then(function(){
+        return cred;
+      });
     })
     .then(function(cred){
-      var r=f.get("requestedRole");
+      var requestedRole=f.get("requestedRole");
+
       return st.db.collection("users").doc(cred.user.uid).set({
         uid:cred.user.uid,
         email:cred.user.email,
         name:f.get("name"),
-        requestedRole:r,
-        role:r==="customer"?"customer":"pending",
-        status:r==="customer"?"approved":"pending",
+        requestedRole:requestedRole,
+        role:requestedRole==="customer"?"customer":"pending",
+        status:requestedRole==="customer"?"approved":"pending",
         createdAt:ts(),
         updatedAt:ts()
-      },{merge:true}).then(function(){return cred});
+      },{merge:true}).then(function(){
+        return cred;
+      });
     })
     .then(function(cred){
-      return enterPanel(cred.user, "signup");
+      return enterPanel(cred.user,"signup");
     })
-    .then(function(){toast("Conta criada.","ok")})
-    .catch(function(err){toast("Cadastro falhou: "+(err.message||err),"err")})
-    .finally(function(){busy(false)});
+    .then(function(){
+      toast("Conta criada.","ok");
+    })
+    .catch(function(err){
+      toast("Cadastro falhou: "+(err.message||err),"err");
+    })
+    .finally(function(){
+      busy(false);
+    });
 }
 
 function google(){
   activeLogin=true;
   busy(true,"Google...");
+
   initFirebase()
     .then(setAuthPersistence)
     .then(function(){
@@ -364,44 +424,62 @@ function google(){
       return st.auth.signInWithPopup(provider);
     })
     .then(function(cred){
-      return enterPanel(cred.user, "google");
+      return enterPanel(cred.user,"google");
     })
-    .then(function(){toast("Login Google realizado.","ok")})
+    .then(function(){
+      toast("Login Google realizado.","ok");
+    })
     .catch(function(err){
-      toast(err.code==="auth/unauthorized-domain"
-        ?"Google bloqueado: adicione davicostadua480-oss.github.io no Firebase Auth > Authorized domains."
-        :"Google falhou: "+(err.message||err),"err")
+      if(err.code==="auth/unauthorized-domain"){
+        toast("Google bloqueado: adicione davicostadua480-oss.github.io no Firebase Auth > Authorized domains.","err");
+        return;
+      }
+
+      toast("Google falhou: "+(err.message||err),"err");
     })
-    .finally(function(){activeLogin=false;busy(false)});
+    .finally(function(){
+      activeLogin=false;
+      busy(false);
+    });
 }
 
 function bootAuth(){
   showLogin();
+
   initFirebase()
     .then(setAuthPersistence)
     .then(function(){
-      if(authObserverStarted) return;
+      if(authObserverStarted){
+        return;
+      }
+
       authObserverStarted=true;
+
       st.auth.onAuthStateChanged(function(user){
-        if(activeLogin) return;
+        if(activeLogin){
+          return;
+        }
+
         if(!user){
           panelUid=null;
           showLogin();
           return;
         }
-        enterPanel(user, "restore").catch(function(err){
-          console.error("RESTORE_SESSION_ERROR",err);
+
+        enterPanel(user,"restore").catch(function(err){
+          console.error("RESTORE_SESSION_ERROR:",err);
           toast("Sessão encontrada, mas não consegui abrir o painel: "+(err.message||err),"err");
           showLogin();
         });
       });
     })
     .catch(function(err){
-      console.error("BOOT_AUTH_ERROR",err);
+      console.error("BOOT_AUTH_ERROR:",err);
       toast("Erro ao iniciar Firebase: "+(err.message||err),"err");
       showLogin();
     });
 }
+
 function productPresetEmoji(p){var k=String((p&&p.imagePreset)||"").toLowerCase();var map={burger:"🍔",pizza:"🍕",drink:"🥤",fries:"🍟",sushi:"🍣",dessert:"🍰",salad:"🥗",acai:"🫐",coffee:"☕",plate:"🍽️"};return map[k]||(p&&p.emoji)||"🍽️"}
 function productThumb(p){return (p&&p.imageUrl)?'<div class="adminProductThumb"><img src="'+esc(p.imageUrl)+'" alt="'+esc(p.name||"Produto")+'"></div>':'<div class="adminProductThumb"><span>'+productPresetEmoji(p)+'</span></div>'}
 function presetOptions(selected){var opts=[["","Automática"],["burger","Burger"],["pizza","Pizza"],["drink","Bebida"],["fries","Batata/porção"],["sushi","Sushi"],["dessert","Sobremesa"],["salad","Salada"],["acai","Açaí"],["coffee","Café"],["plate","Prato genérico"]];return opts.map(function(o){return '<option value="'+o[0]+'" '+(selected===o[0]?'selected':'')+'>'+o[1]+'</option>'}).join("")}
