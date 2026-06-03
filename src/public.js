@@ -235,21 +235,61 @@ function show(view){
   ["homeView","featuresView","menuView"].forEach(id => $("#"+id).classList.add("hidden"));
   $("#"+view).classList.remove("hidden");
 }
+function publicStoreKeyFromUrl(){
+  const params = new URLSearchParams(location.search || "");
+  const queryKey = params.get("loja") || params.get("store") || params.get("slug") || params.get("cardapio") || "";
+  if(queryKey) return decodeURIComponent(queryKey);
+
+  const hash = location.hash || "";
+  if(hash.startsWith("#/cardapio")){
+    return decodeURIComponent(hash.split("/")[2] || "demo");
+  }
+
+  return "";
+}
+
+function setCanonicalStoreHash(key){
+  if(!key || (location.hash || "").startsWith("#/cardapio")) return;
+  try{
+    history.replaceState(null, "", location.pathname + location.search + "#/cardapio/" + encodeURIComponent(key));
+  }catch(err){
+    location.hash = "#/cardapio/" + encodeURIComponent(key);
+  }
+}
+
+function findStoreByKey(key){
+  const clean = String(key || "demo").trim();
+  const cleanNorm = normalize(clean);
+
+  if(!clean || clean === "demo"){
+    return demoStore();
+  }
+
+  return state.stores.find(store =>
+    store.id === clean ||
+    normalize(store.slug || "") === cleanNorm ||
+    slug(store) === cleanNorm
+  ) || null;
+}
+
 function route(){
   const hash = location.hash || "#/";
-  if(hash === "#/recursos"){ show("featuresView"); return; }
-  if(hash.startsWith("#/cardapio")){
-    const key = decodeURIComponent(hash.split("/")[2] || "demo");
-    const keyNorm = normalize(key);
-    if(key === "demo"){
-      state.activeStore = demoStore();
-    }else{
-      state.activeStore = state.stores.find(s => s.id === key || normalize(s.slug || "") === keyNorm || slug(s) === keyNorm) || null;
-    }
+  const urlStoreKey = publicStoreKeyFromUrl();
+
+  if(hash === "#/recursos"){
+    show("featuresView");
+    return;
+  }
+
+  if(hash.startsWith("#/cardapio") || urlStoreKey){
+    const key = urlStoreKey || decodeURIComponent(hash.split("/")[2] || "demo");
+    setCanonicalStoreHash(key);
+    state.activeStore = findStoreByKey(key);
     show("menuView");
     renderMenu();
     return;
   }
+
   show("homeView");
 }
 function parseTimeToMinutes(value){

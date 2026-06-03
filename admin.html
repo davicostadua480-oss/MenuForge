@@ -640,7 +640,8 @@ function hoursModeLabel(store){
 function storePublicLink(store){
   var base=location.href.split("#")[0].replace(/admin\.html.*$/,"");
   if(!/\/$/.test(base))base+="/";
-  return base+"?v=loja#/cardapio/"+encodeURIComponent((store&&store.slug)||store.id||"demo");
+  var key=encodeURIComponent((store&&store.slug)||store.id||"demo");
+  return base+"?v=storelink&loja="+key+"#/cardapio/"+key;
 }
 function copyText(text){
   if(navigator.clipboard&&navigator.clipboard.writeText){
