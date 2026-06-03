@@ -641,7 +641,7 @@ function storePublicLink(store){
   var base=location.href.split("#")[0].replace(/admin\.html.*$/,"");
   if(!/\/$/.test(base))base+="/";
   var key=encodeURIComponent((store&&store.slug)||store.id||"demo");
-  return base+"?v=storelink&loja="+key+"#/cardapio/"+key;
+  return base+"?v=route-final-3&loja="+key+"#/cardapio/"+key;
 }
 function copyText(text){
   if(navigator.clipboard&&navigator.clipboard.writeText){

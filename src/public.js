@@ -238,9 +238,13 @@ function show(view){
 function publicStoreKeyFromUrl(){
   const params = new URLSearchParams(location.search || "");
   const queryKey = params.get("loja") || params.get("store") || params.get("slug") || params.get("cardapio") || "";
-  if(queryKey) return decodeURIComponent(queryKey);
+
+  if(queryKey){
+    return decodeURIComponent(queryKey);
+  }
 
   const hash = location.hash || "";
+
   if(hash.startsWith("#/cardapio")){
     return decodeURIComponent(hash.split("/")[2] || "demo");
   }
@@ -249,7 +253,10 @@ function publicStoreKeyFromUrl(){
 }
 
 function setCanonicalStoreHash(key){
-  if(!key || (location.hash || "").startsWith("#/cardapio")) return;
+  if(!key || (location.hash || "").startsWith("#/cardapio")){
+    return;
+  }
+
   try{
     history.replaceState(null, "", location.pathname + location.search + "#/cardapio/" + encodeURIComponent(key));
   }catch(err){
@@ -550,7 +557,7 @@ function qty(id,delta){
 }
 function address(order){ const a=order.address||{}; return [a.street,a.number,a.district,a.complement,a.reference].filter(Boolean).join(", "); }
 function wa(phone,msg){ const p=String(phone||"").replace(/\D/g,""); return "https://wa.me/"+p+"?text="+encodeURIComponent(msg); }
-async async async function submitOrder(form){
+async function submitOrder(form){
   if(!state.cart.length) return toast("Carrinho vazio.", "err");
 
   const store = state.activeStore || demoStore();
