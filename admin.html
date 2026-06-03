@@ -128,6 +128,91 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}input,select,tex
 .financialFilters label{min-width:160px}
 @media(max-width:850px){.financialGrid{grid-template-columns:1fr}.financialFilters label,.financialFilters .btn{width:100%}}
 
+
+/* forgecms-brand-resize-v2 */
+.sideHead .logo{
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+  min-width:0!important;
+  overflow:hidden!important;
+}
+.sideHead .logo>span,
+.sideHead .logo>span.brandAssetIcon{
+  width:46px!important;
+  height:46px!important;
+  min-width:46px!important;
+  max-width:46px!important;
+  min-height:46px!important;
+  max-height:46px!important;
+  flex:0 0 46px!important;
+  border-radius:16px!important;
+  display:grid!important;
+  place-items:center!important;
+  overflow:hidden!important;
+  padding:0!important;
+  background:linear-gradient(135deg,var(--p),var(--p2))!important;
+  box-shadow:0 14px 38px rgba(85,224,255,.18)!important;
+  border:1px solid rgba(85,224,255,.24)!important;
+}
+.sideHead .logo>span img,
+.sideHead .logo>span.brandAssetIcon img{
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  object-fit:cover!important;
+  display:block!important;
+  border-radius:inherit!important;
+}
+.sideHead .logo>div{
+  min-width:0!important;
+  overflow:hidden!important;
+}
+.sideHead .logo b,
+.sideHead .logo small{
+  display:block!important;
+  max-width:170px!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.brandOrb.brandAssetOrb{
+  width:92px!important;
+  height:92px!important;
+  min-width:92px!important;
+  max-width:92px!important;
+  min-height:92px!important;
+  max-height:92px!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:transparent!important;
+  box-shadow:0 24px 80px rgba(85,224,255,.22)!important;
+}
+.brandOrb.brandAssetOrb img{
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  display:block!important;
+  border-radius:inherit!important;
+}
+@media(max-width:850px){
+  .sideHead .logo>span,
+  .sideHead .logo>span.brandAssetIcon{
+    width:42px!important;
+    height:42px!important;
+    min-width:42px!important;
+    max-width:42px!important;
+    min-height:42px!important;
+    max-height:42px!important;
+    border-radius:14px!important;
+  }
+  .sideHead .logo b{max-width:145px!important}
+  .sideHead .logo small{max-width:145px!important}
+}
+
 </style>
 <script>
 window.__lastErrorToast="";

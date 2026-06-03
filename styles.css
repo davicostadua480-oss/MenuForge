@@ -32,3 +32,35 @@ dialog{border:0;background:transparent;padding:0;width:min(900px,calc(100vw - 24
 .showcaseBrandIcon{width:42px;height:42px;border-radius:15px;object-fit:cover;box-shadow:0 12px 32px color-mix(in srgb,var(--p2) 16%,transparent);vertical-align:middle;margin-right:8px}
 @media(max-width:760px){.heroBrandImage{width:min(360px,100%);margin-bottom:18px}.public-header .brand small{display:none}}
 
+
+
+/* forgecms-public-brand-resize-v2 */
+.public-header .brand>span{
+  width:48px!important;
+  height:48px!important;
+  min-width:48px!important;
+  max-width:48px!important;
+  min-height:48px!important;
+  max-height:48px!important;
+  flex:0 0 48px!important;
+  padding:0!important;
+  overflow:hidden!important;
+}
+.public-header .brand>span img{
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  display:block!important;
+  border-radius:inherit!important;
+}
+@media(max-width:760px){
+  .public-header .brand>span{
+    width:42px!important;
+    height:42px!important;
+    min-width:42px!important;
+    max-width:42px!important;
+    min-height:42px!important;
+    max-height:42px!important;
+  }
+}
+
