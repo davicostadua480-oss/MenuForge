@@ -27,6 +27,13 @@ mfProductImagesCss.textContent = `
 .product-img.has-photo img{width:100%;height:100%;object-fit:cover;display:block}
 `;
 document.head.appendChild(mfProductImagesCss);
+const mfHoursPhase4Css = document.createElement("style");
+mfHoursPhase4Css.id = "mfHoursPhase4Style";
+mfHoursPhase4Css.textContent = `
+#checkoutButton.is-closed{opacity:.62;filter:grayscale(.35);cursor:not-allowed}
+.store-closed-warning{border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.10);border-radius:16px;padding:12px;margin-top:10px}
+`;
+document.head.appendChild(mfHoursPhase4Css);
 const mfCmsPhase3Css = document.createElement("style");
 mfCmsPhase3Css.id = "mfCmsPhase3Style";
 mfCmsPhase3Css.textContent = `
@@ -245,6 +252,68 @@ function route(){
   }
   show("homeView");
 }
+function parseTimeToMinutes(value){
+  const match = String(value || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if(!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function normalizeStoreHours(store){
+  const raw = store?.hours || store?.openingHours || {};
+  const scheduleRaw = raw.schedule || raw.days || {};
+  const schedule = {};
+  for(let day=0; day<7; day++){
+    const key = String(day);
+    const ranges = Array.isArray(scheduleRaw[key]) ? scheduleRaw[key] : [];
+    schedule[key] = ranges
+      .filter(range => Array.isArray(range) && range.length >= 2)
+      .map(range => [String(range[0] || "").trim(), String(range[1] || "").trim()]);
+  }
+  return {
+    isAuto: raw.isAuto === true || raw.enabled === true || store?.status === "auto",
+    schedule
+  };
+}
+
+function isMinuteInsideRange(nowMinutes, startMinutes, endMinutes){
+  if(startMinutes === null || endMinutes === null) return false;
+  if(startMinutes === endMinutes) return true;
+  if(endMinutes > startMinutes) return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+  return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+}
+
+function isStoreOpen(store, date = new Date()){
+  if(!store) return true;
+  if(store.status === "closed") return false;
+
+  const cfg = normalizeStoreHours(store);
+
+  if(!cfg.isAuto){
+    return store.status !== "closed";
+  }
+
+  const dayKey = String(date.getDay());
+  const ranges = cfg.schedule[dayKey] || [];
+
+  if(!ranges.length) return false;
+
+  const nowMinutes = date.getHours() * 60 + date.getMinutes();
+
+  return ranges.some(range => {
+    const start = parseTimeToMinutes(range[0]);
+    const end = parseTimeToMinutes(range[1]);
+    return isMinuteInsideRange(nowMinutes, start, end);
+  });
+}
+
+function storeHoursText(store){
+  const cfg = normalizeStoreHours(store);
+  const names = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  return names.map((name,index) => {
+    const ranges = cfg.schedule[String(index)] || [];
+    return `${name}: ${ranges.length ? ranges.map(r => r.join(" às ")).join(", ") : "fechado"}`;
+  }).join(" · ");
+}
 function renderMenu(){
   const store = state.activeStore;
   if(!store){
@@ -255,23 +324,35 @@ function renderMenu(){
     renderCart();
     return;
   }
+
+  const open = isStoreOpen(store);
   const categories = storeCategories(store.id);
   let products = storeProducts(store.id).filter(p => p.active !== false);
+
   if(state.menuCategory !== "all") products = products.filter(p => p.categoryId === state.menuCategory);
+
   const q = normalize(state.menuSearch);
   if(q) products = products.filter(p => normalize(p.name + " " + (p.description || "")).includes(q));
 
-  const open = isStoreOpen(store);
-  $("#storeHero").innerHTML = `<h1>${esc(store.name)}</h1><p>${esc(store.headline || "Cardápio digital inteligente.")}</p><div class="badges"><span class="badge ${open ? "ok" : "warn"}">${open ? "Aberto" : "Fechado"}</span><span class="badge">Entrega ${money(store.deliveryFee)}</span><span class="badge">Mínimo ${money(store.minOrder)}</span></div>${open ? "" : `<div class="store-closed-warning">A loja está fechada agora. Você pode visualizar o cardápio, mas confirme o atendimento pelo WhatsApp.</div>`}`;
-  renderPromos(store);
+  $("#storeHero").innerHTML = `<h1>${esc(store.name)}</h1><p>${esc(store.headline || "Cardápio digital inteligente.")}</p><div class="badges"><span class="badge ${open ? "ok" : "warn"}">${open ? "Aberto" : "Fechado"}</span><span class="badge">Entrega ${money(store.deliveryFee)}</span><span class="badge">Mínimo ${money(store.minOrder)}</span></div>${open ? "" : `<div class="store-closed-warning"><b>No momento estamos fechados.</b><br>${esc(storeHoursText(store))}</div>`}`;
+
+  if(typeof renderPromos === "function") renderPromos(store);
+
   $("#categoryList").innerHTML = `<button class="cat-btn ${state.menuCategory === "all" ? "active" : ""}" data-cat="all">Tudo</button>` + categories.map(c => `<button class="cat-btn ${state.menuCategory === c.id ? "active" : ""}" data-cat="${c.id}">${esc(c.name)}</button>`).join("");
-  $$("#categoryList [data-cat]").forEach(btn => btn.onclick = () => { state.menuCategory = btn.dataset.cat; renderMenu(); });
+
+  $$("#categoryList [data-cat]").forEach(btn => btn.onclick = () => {
+    state.menuCategory = btn.dataset.cat;
+    renderMenu();
+  });
+
   $("#productGrid").innerHTML = products.map((p,i)=>`<article class="product-card">${productImageHtml(p,i)}<div class="product-body"><div class="badges">${p.featured ? "<span class='badge ok'>Destaque</span>" : ""}<span class="badge">${p.prepTime || 20} min</span></div><h3>${esc(p.name)}</h3><p>${esc(p.description || "Produto do cardápio.")}</p><div class="product-foot"><strong class="price">${money(p.price)}</strong><button class="btn primary" data-add="${p.id}" type="button">${p.multiFlavor ? "Escolher sabores" : "Adicionar"}</button></div></div></article>`).join("") || `<div class="empty">Nenhum produto cadastrado nesta loja ainda.</div>`;
+
   $$("[data-add]").forEach(btn => btn.onclick = () => {
     const product = storeProducts((state.activeStore || demoStore()).id).find(p => p.id === btn.dataset.add);
     if(product?.multiFlavor) return showFlavorPicker(product);
     addToCart(btn.dataset.add);
   });
+
   renderCart();
 }
 function showFlavorPicker(product){
@@ -388,6 +469,15 @@ function renderCart(){
       $("#couponStatus").textContent = "Digite um cupom publicado no ForgeCMS.";
     }
   }
+
+  const checkoutButton = $("#checkoutButton");
+  if(checkoutButton){
+    const open = isStoreOpen(state.activeStore || demoStore());
+    checkoutButton.classList.toggle("is-closed", !open);
+    checkoutButton.setAttribute("aria-disabled", open ? "false" : "true");
+    checkoutButton.title = open ? "Finalizar pedido" : "No momento estamos fechados. Confira nossos horários de atendimento.";
+    checkoutButton.textContent = open ? "Finalizar pedido" : "Loja fechada";
+  }
 }
 function qty(id,delta){
   const item = state.cart.find(i=>(i.cartId || i.id)===id);
@@ -398,11 +488,19 @@ function qty(id,delta){
 }
 function address(order){ const a=order.address||{}; return [a.street,a.number,a.district,a.complement,a.reference].filter(Boolean).join(", "); }
 function wa(phone,msg){ const p=String(phone||"").replace(/\D/g,""); return "https://wa.me/"+p+"?text="+encodeURIComponent(msg); }
-async async function submitOrder(form){
+async async async function submitOrder(form){
   if(!state.cart.length) return toast("Carrinho vazio.", "err");
 
-  const fd = new FormData(form);
   const store = state.activeStore || demoStore();
+
+  if(!isStoreOpen(store)){
+    toast("No momento estamos fechados. Confira nossos horários de atendimento.", "err");
+    renderMenu();
+    renderCart();
+    return;
+  }
+
+  const fd = new FormData(form);
   const totals = cartTotals();
 
   const order = {
@@ -421,7 +519,7 @@ async async function submitOrder(form){
     })),
     subtotal: totals.subtotal,
     deliveryFee: totals.delivery,
-    discount: totals.discount,
+    discount: totals.discount || 0,
     total: totals.total,
     coupon: totals.coupon ? {
       id: totals.coupon.id,
@@ -430,6 +528,7 @@ async async function submitOrder(form){
       label: totals.couponLabel,
       rawContent: totals.coupon.content || ""
     } : null,
+    storeHours: normalizeStoreHours(store),
     status: "new",
     shortId: Math.random().toString(36).slice(2,8).toUpperCase(),
     customer: {
@@ -498,7 +597,19 @@ function bind(){
 
   $("#openCart").onclick = () => $("#cartDrawer").classList.remove("hidden");
   $("#closeCart").onclick = () => $("#cartDrawer").classList.add("hidden");
-  $("#checkoutButton").onclick = () => state.cart.length ? $("#checkoutDialog").showModal() : toast("Carrinho vazio.", "err");
+
+  $("#checkoutButton").onclick = () => {
+    const store = state.activeStore || demoStore();
+
+    if(!isStoreOpen(store)){
+      toast("No momento estamos fechados. Confira nossos horários de atendimento.", "err");
+      renderMenu();
+      renderCart();
+      return;
+    }
+
+    state.cart.length ? $("#checkoutDialog").showModal() : toast("Carrinho vazio.", "err");
+  };
 
   $$("#checkoutDialog [data-close-checkout], #checkoutDialog button[value='cancel'], #checkoutDialog .close").forEach(button => {
     button.onclick = event => {
