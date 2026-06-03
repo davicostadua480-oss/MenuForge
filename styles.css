@@ -23,3 +23,12 @@ dialog{border:0;background:transparent;padding:0;width:min(900px,calc(100vw - 24
 @media(max-width:1100px){.hero,.admin-login{grid-template-columns:1fr}.feature-grid,.product-grid,.grid-4,.grid-3,.theme-grid,.plugin-grid,.media-grid{grid-template-columns:repeat(2,1fr)}.menu-layout{grid-template-columns:1fr}.category-list{position:static;display:flex;overflow:auto}.cat-btn{white-space:nowrap}.grid-2{grid-template-columns:1fr}}
 @media(max-width:820px){.public-header{border-radius:0;margin:0;width:100%}.public-header nav,.brand small{display:none}.hero,.content-page,.menu-page{width:calc(100% - 24px);padding:34px 0}.hero h1{font-size:38px}.metric-strip,.feature-grid,.product-grid,.grid-4,.grid-3,.form-grid,.theme-grid,.plugin-grid,.media-grid{grid-template-columns:1fr}.menu-toolbar{position:sticky;top:0;background:var(--bg);z-index:10;padding:10px 0;flex-direction:column}.cart{inset:0;width:100%;border-radius:0}.admin-login{width:calc(100% - 18px);padding:18px 0}.login-brand-panel{display:none}.login-card{padding:18px;border-radius:28px}.admin-shell{grid-template-columns:1fr}.cms-sidebar{position:fixed;inset:0 auto 0 0;width:min(340px,88vw);transform:translateX(-105%);transition:.2s}.cms-sidebar.open{transform:none}.sidebar-close{display:inline-flex}.sidebar-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(5px);z-index:70}.cms-topbar{flex-wrap:wrap}.title-block{order:4;flex-basis:100%}.topbar-actions{width:100%}.topbar-actions .btn{flex:1}.workspace{padding:14px}.dialog-card{width:calc(100vw - 16px)}.screen-options{padding:12px}.metric-card strong{font-size:30px}}
 
+
+
+/* forgecms-brand-assets-v1 */
+.brand>span{background:transparent!important;box-shadow:0 14px 38px color-mix(in srgb,var(--p2) 18%,transparent)!important;overflow:hidden;padding:0;border:1px solid color-mix(in srgb,var(--p2) 24%,var(--line))}
+.brand>span img{width:100%;height:100%;display:block;object-fit:cover;border-radius:inherit}
+.heroBrandImage{width:min(460px,100%);height:auto;display:block;margin:0 0 22px;border-radius:24px;box-shadow:0 22px 70px rgba(0,0,0,.22);opacity:.96}
+.showcaseBrandIcon{width:42px;height:42px;border-radius:15px;object-fit:cover;box-shadow:0 12px 32px color-mix(in srgb,var(--p2) 16%,transparent);vertical-align:middle;margin-right:8px}
+@media(max-width:760px){.heroBrandImage{width:min(360px,100%);margin-bottom:18px}.public-header .brand small{display:none}}
+

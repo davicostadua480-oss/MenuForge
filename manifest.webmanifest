@@ -1,10 +1,24 @@
 {
-  "name": "ForgeCMS MenuForge",
+  "name": "ForgeCMS",
   "short_name": "ForgeCMS",
-  "start_url": "./",
+  "description": "ForgeCMS + MenuForge Delivery Platform",
+  "start_url": "./?v=brand",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#070b16",
-  "theme_color": "#0a0f1e",
-  "icons": [{"src":"./assets/favicon.svg","sizes":"any","type":"image/svg+xml"}]
+  "background_color": "#080d1b",
+  "theme_color": "#080d1b",
+  "icons": [
+    {
+      "src": "./assets/brand/forgecms-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/brand/forgecms-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
-

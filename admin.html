@@ -163,13 +163,19 @@ window.onunhandledrejection=function(ev){
   setTimeout(function(){try{e.remove()}catch(_){}} ,6500);
 };
 </script>
+<!-- forgecms-brand-assets-v1 -->
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/brand/favicon.png?v=brand1">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/brand/forgecms-icon-180.png?v=brand1">
+  <link rel="manifest" href="./manifest.webmanifest?v=brand1">
+  <meta name="application-name" content="ForgeCMS">
+  <meta name="apple-mobile-web-app-title" content="ForgeCMS">
 </head>
 <body>
 <div id="toasts" class="toastArea"></div>
 
 <main id="login" class="login">
   <section class="box intro">
-    <div class="brandOrb">FC</div>
+    <div class="brandOrb brandAssetOrb"><img src="./assets/brand/forgecms-icon-192.png?v=brand1" alt="ForgeCMS"></div>
     <p class="brandPill">ForgeCMS · MenuForge Engine</p>
     <h1 class="brandName">ForgeCMS</h1>
     <p class="muted">O núcleo administrativo do MenuForge: conteúdo, lojas, produtos, pedidos, entregadores e módulos em um painel próprio.</p>
@@ -200,8 +206,8 @@ window.onunhandledrejection=function(ev){
 <section id="shell" class="shell hidden">
   <div id="back" class="drawer hidden"></div>
   <aside id="side" class="side">
-    <div class="sideHead"><div class="logo"><span>FC</span><div><b>ForgeCMS</b><small id="roleLabel" class="muted">admin</small></div></div><button id="closeSide" class="btn" type="button">×</button></div>
-    <div class="chip"><small>Projeto</small><b id="projectName">MenuForge</b></div>
+    <div class="sideHead"><div class="logo"><span class="brandAssetIcon"><img src="./assets/brand/forgecms-icon-96.png?v=brand1" alt="ForgeCMS"></span><div><b>ForgeCMS</b><small id="roleLabel" class="muted">admin</small></div></div><button id="closeSide" class="btn" type="button">×</button></div>
+    <div class="chip"><small>Projeto</small><b id="projectName">MenuForge Delivery</b></div>
     <nav id="nav" class="nav"></nav>
     <div class="sideActions"><button id="publicBtn" class="btn soft full" type="button">Abrir site</button><button id="logoutBtn" class="btn danger full" type="button">Sair</button></div>
   </aside>

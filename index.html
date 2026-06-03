@@ -3,38 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>MenuForge — powered by ForgeCMS</title>
-  <meta name="description" content="Cardápio digital, pedidos, entregas e CMS próprio em Firebase." />
+  <title>ForgeCMS — MenuForge Delivery Platform</title>
+  <meta name="description" content="ForgeCMS: plataforma de cardápio digital, delivery, pedidos, entregadores e CMS próprio em Firebase." />
   <meta name="theme-color" content="#0a0f1e" />
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./styles.css?v=forgecms" />
+<!-- forgecms-brand-assets-v1 -->
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/brand/favicon.png?v=brand1">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/brand/forgecms-icon-180.png?v=brand1">
+  <link rel="manifest" href="./manifest.webmanifest?v=brand1">
+  <meta name="application-name" content="ForgeCMS">
+  <meta name="apple-mobile-web-app-title" content="ForgeCMS">
 </head>
 <body>
   <div id="toastArea" class="toast-area"></div>
 
   <header class="public-header">
-    <a class="brand" href="./">
-      <span>MF</span>
-      <div>
-        <strong id="publicBrand">MenuForge</strong>
-        <small>Cardápio digital + ForgeCMS</small>
-      </div>
-    </a>
+    <a class="brand" href="./?v=brand1"><span><img src="./assets/brand/forgecms-icon-64.png?v=brand1" alt="ForgeCMS"></span><div><strong id="publicBrand">ForgeCMS</strong><small>MenuForge Delivery Engine</small></div></a>
 
     <nav>
       <a href="#/">Início</a>
       <a href="#/cardapio/demo">Cardápio demo</a>
       <a href="#/recursos">Recursos</a>
-      <a href="./admin.html?v=auth-arch2">Admin</a>
+      <a href="./admin.html?v=brand1">Admin</a>
     </nav>
 
-    <a class="btn primary" href="./admin.html?v=auth-arch2">Painel</a>
+    <a class="btn primary" href="./admin.html?v=brand1">Painel</a>
   </header>
 
   <main id="publicRoot">
     <section id="homeView" class="hero page-screen">
       <div class="hero-copy">
+        <img class="heroBrandImage" src="./assets/brand/forgecms-wordmark-600x200.png?v=brand1" alt="ForgeCMS">
         <p class="eyebrow"><i></i> MenuForge instalado sobre ForgeCMS</p>
         <h1>Um cardápio digital montado sobre um CMS próprio.</h1>
         <p class="lead">
@@ -43,21 +44,21 @@
         </p>
         <div class="actions">
           <a class="btn primary big" href="#/cardapio/demo">Ver cardápio demo</a>
-          <a class="btn soft big" href="./admin.html?v=auth-arch2">Entrar no ForgeCMS</a>
+          <a class="btn soft big" href="./admin.html?v=brand1">Entrar no ForgeCMS</a>
         </div>
         <div class="metric-strip">
           <article><strong>CMS</strong><span>núcleo reutilizável</span></article>
-          <article><strong>MF</strong><span>módulo delivery</span></article>
+          <article><strong>FC</strong><span>ForgeCMS core</span></article>
           <article><strong>FB</strong><span>Firebase/Firestore</span></article>
         </div>
       </div>
 
       <aside class="showcase-card">
-        <div class="device-top"><span>ForgeCMS</span><b>online</b></div>
+        <div class="device-top"><span><img class="showcaseBrandIcon" src="./assets/brand/forgecms-icon-64.png?v=brand1" alt=""> ForgeCMS</span><b>online</b></div>
         <div class="order-preview"><strong>Posts / Páginas</strong><span>conteúdo</span></div>
         <div class="order-preview"><strong>Produtos / Pedidos</strong><span>delivery</span></div>
         <div class="route-line"><i></i><i></i><i></i><em></em></div>
-        <a class="btn primary full" href="./admin.html?v=auth-arch2">Acessar admin</a>
+        <a class="btn primary full" href="./admin.html?v=brand1">Acessar admin</a>
       </aside>
     </section>
 
@@ -129,7 +130,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="./src/public.js?v=route-final-3"></script>
+  <script type="module" src="./src/public.js?v=brand1"></script>
 </body>
 </html>
 
