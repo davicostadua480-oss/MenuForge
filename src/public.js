@@ -258,17 +258,38 @@ function parseTimeToMinutes(value){
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+function normalizeStoreHoursRange(range){
+  if(Array.isArray(range)){
+    return {
+      open:String(range[0] || "").trim(),
+      close:String(range[1] || "").trim()
+    };
+  }
+
+  if(range && typeof range === "object"){
+    return {
+      open:String(range.open || range.from || range.start || "").trim(),
+      close:String(range.close || range.to || range.end || "").trim()
+    };
+  }
+
+  return null;
+}
+
 function normalizeStoreHours(store){
   const raw = store?.hours || store?.openingHours || {};
   const scheduleRaw = raw.schedule || raw.days || {};
   const schedule = {};
+
   for(let day=0; day<7; day++){
     const key = String(day);
     const ranges = Array.isArray(scheduleRaw[key]) ? scheduleRaw[key] : [];
+
     schedule[key] = ranges
-      .filter(range => Array.isArray(range) && range.length >= 2)
-      .map(range => [String(range[0] || "").trim(), String(range[1] || "").trim()]);
+      .map(normalizeStoreHoursRange)
+      .filter(range => range && range.open && range.close);
   }
+
   return {
     isAuto: raw.isAuto === true || raw.enabled === true || store?.status === "auto",
     schedule
@@ -300,8 +321,8 @@ function isStoreOpen(store, date = new Date()){
   const nowMinutes = date.getHours() * 60 + date.getMinutes();
 
   return ranges.some(range => {
-    const start = parseTimeToMinutes(range[0]);
-    const end = parseTimeToMinutes(range[1]);
+    const start = parseTimeToMinutes(range.open);
+    const end = parseTimeToMinutes(range.close);
     return isMinuteInsideRange(nowMinutes, start, end);
   });
 }
@@ -309,9 +330,10 @@ function isStoreOpen(store, date = new Date()){
 function storeHoursText(store){
   const cfg = normalizeStoreHours(store);
   const names = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
   return names.map((name,index) => {
     const ranges = cfg.schedule[String(index)] || [];
-    return `${name}: ${ranges.length ? ranges.map(r => r.join(" às ")).join(", ") : "fechado"}`;
+    return `${name}: ${ranges.length ? ranges.map(r => `${r.open} às ${r.close}`).join(", ") : "fechado"}`;
   }).join(" · ");
 }
 function renderMenu(){
