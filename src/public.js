@@ -1,6 +1,6 @@
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -27,6 +27,23 @@ mfProductImagesCss.textContent = `
 .product-img.has-photo img{width:100%;height:100%;object-fit:cover;display:block}
 `;
 document.head.appendChild(mfProductImagesCss);
+const mfCmsPhase3Css = document.createElement("style");
+mfCmsPhase3Css.id = "mfCmsPhase3Style";
+mfCmsPhase3Css.textContent = `
+.promo-area{display:grid;gap:10px;margin:12px 0}
+.promo-card{border:1px solid rgba(85,224,255,.28);background:linear-gradient(135deg,rgba(124,140,255,.16),rgba(85,224,255,.08));border-radius:20px;padding:15px;box-shadow:0 14px 34px rgba(0,0,0,.18)}
+.promo-card h3{margin:.2rem 0 .3rem;font-size:1.15rem}
+.promo-card p{margin:.2rem 0;color:var(--muted)}
+.coupon-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.coupon-chip{border:1px dashed rgba(255,255,255,.25);background:rgba(255,255,255,.05);border-radius:999px;padding:7px 10px;font-weight:900}
+.coupon-box{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:8px 0}
+.coupon-box input{min-width:0}
+.coupon-status{margin:2px 0 8px;font-size:.88rem;color:var(--muted)}
+.coupon-status.ok{color:#22c55e}
+.coupon-status.err{color:#ef4444}
+@media(max-width:650px){.coupon-box{grid-template-columns:1fr}.coupon-box .btn{width:100%}}
+`;
+document.head.appendChild(mfCmsPhase3Css);
 const mfCmsBridgeCss = document.createElement("style");
 mfCmsBridgeCss.id = "mfCmsBridgeStyle";
 mfCmsBridgeCss.textContent = `
@@ -82,54 +99,131 @@ function productImageHtml(p,i){
     ? `<div class="product-img has-photo"><img src="${esc(p.imageUrl)}" alt="${esc(p.name || "Produto")}" loading="lazy"></div>`
     : `<div class="product-img">${productPresetEmoji(p) || ["🍔","🍕","🥤","🍟"][i%4]}</div>`;
 }
-function storeContent(store){
-  return state.content.filter(c => c.status === "published" && (!c.storeId || c.storeId === store?.id || c.storeSlug === store?.slug));
-}
-function publicBanners(store){ return storeContent(store).filter(c => c.type === "banner"); }
-function publicCoupons(store){ return storeContent(store).filter(c => c.type === "coupon"); }
-function couponCode(c){ return normalize(c.slug || c.title || "").replace(/[^a-z0-9]+/g,""); }
-function findCoupon(code){
-  const k = normalize(code || "").replace(/[^a-z0-9]+/g,"");
-  if(!k || !state.activeStore) return null;
-  return publicCoupons(state.activeStore).find(c => couponCode(c) === k) || null;
-}
-function couponDiscount(coupon, subtotal){
-  if(!coupon) return 0;
-  const raw = String(coupon.content || coupon.excerpt || coupon.title || "");
-  const m = raw.match(/(\d+(?:[,.]\d+)?)/);
-  if(!m) return 0;
-  const n = Number(m[1].replace(",", "."));
-  if(!Number.isFinite(n) || n <= 0) return 0;
-  return raw.includes("%") ? Math.min(subtotal, subtotal * n / 100) : Math.min(subtotal, n);
-}
-function isStoreOpen(store){
-  if(!store) return true;
-  if(store.status === "closed") return false;
-  if(store.status !== "auto") return true;
-  const h = store.hours || {};
-  if(!h.enabled) return true;
-  const now = new Date();
-  const day = String(now.getDay());
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const ranges = (h.days && h.days[day]) || [];
-  return ranges.some(r => {
-    const a = String(r[0] || "00:00").split(":").map(Number);
-    const b = String(r[1] || "00:00").split(":").map(Number);
-    const start = (a[0] || 0) * 60 + (a[1] || 0);
-    let end = (b[0] || 0) * 60 + (b[1] || 0);
-    if(end < start) end += 24 * 60;
-    return minutes >= start && minutes <= end;
-  });
-}
-function renderPromos(store){
-  const banners = publicBanners(store);
-  const coupons = publicCoupons(store);
-  const parts = [];
-  banners.slice(0,3).forEach(b => parts.push(`<article class="promo-card"><span class="badge ok">Promoção</span><h3>${esc(b.title)}</h3><p>${esc(b.excerpt || b.content || "")}</p></article>`));
-  if(coupons.length) parts.push(`<div class="coupon-strip">${coupons.slice(0,6).map(c => `<span class="coupon-chip">Cupom ${esc(c.slug || c.title)}</span>`).join("")}</div>`);
-  if($("#promoArea")) $("#promoArea").innerHTML = parts.join("");
+function contentStoreMatches(item, store){
+  if(!item || !store) return false;
+  const itemStoreId = String(item.storeId || "").trim();
+  const itemStoreSlug = normalize(item.storeSlug || item.store || "");
+  const activeSlug = normalize(store.slug || "");
+  return !itemStoreId && !itemStoreSlug || itemStoreId === store.id || itemStoreSlug === activeSlug || itemStoreSlug === slug(store);
 }
 
+function publishedContent(store, type){
+  return state.content
+    .filter(item => item && item.status === "published")
+    .filter(item => !type || item.type === type)
+    .filter(item => contentStoreMatches(item, store))
+    .sort((a,b) => Number(a.order ?? a.priority ?? 0) - Number(b.order ?? b.priority ?? 0));
+}
+
+function publicBanners(store){
+  return publishedContent(store, "banner");
+}
+
+function publicCoupons(store){
+  return publishedContent(store, "coupon");
+}
+
+function couponCode(coupon){
+  return normalize(coupon?.slug || coupon?.code || coupon?.title || "").replace(/[^a-z0-9]+/g,"");
+}
+
+function normalizeCouponCode(code){
+  return normalize(code || "").replace(/[^a-z0-9]+/g,"");
+}
+
+function findCoupon(code){
+  const normalized = normalizeCouponCode(code);
+  if(!normalized || !state.activeStore) return null;
+  return publicCoupons(state.activeStore).find(coupon => couponCode(coupon) === normalized) || null;
+}
+
+function parseCouponConfig(coupon){
+  if(!coupon) return null;
+
+  const raw = String(coupon.content || coupon.excerpt || coupon.description || coupon.title || "").trim();
+  let parsed = null;
+
+  if(raw.startsWith("{") && raw.endsWith("}")){
+    try{
+      const data = JSON.parse(raw);
+      const mode = String(data.mode || data.type || data.kind || "").toLowerCase();
+      const value = Number(data.value ?? data.amount ?? data.discount ?? data.percent ?? 0);
+      parsed = {
+        mode: mode === "fixed" || mode === "value" || mode === "valor" ? "fixed" : "percent",
+        value,
+        minSubtotal: Number(data.minSubtotal || data.minimum || data.min || 0),
+        maxDiscount: Number(data.maxDiscount || data.max || 0),
+        label: data.label || ""
+      };
+    }catch(err){
+      parsed = null;
+    }
+  }
+
+  if(!parsed){
+    const match = raw.match(/(\d+(?:[,.]\d+)?)/);
+    const value = match ? Number(match[1].replace(",", ".")) : 0;
+    parsed = {
+      mode: raw.includes("%") ? "percent" : "fixed",
+      value,
+      minSubtotal: 0,
+      maxDiscount: 0,
+      label: ""
+    };
+  }
+
+  if(!Number.isFinite(parsed.value) || parsed.value <= 0) return null;
+  if(!Number.isFinite(parsed.minSubtotal) || parsed.minSubtotal < 0) parsed.minSubtotal = 0;
+  if(!Number.isFinite(parsed.maxDiscount) || parsed.maxDiscount < 0) parsed.maxDiscount = 0;
+
+  return parsed;
+}
+
+function couponDiscount(coupon, subtotal){
+  const cfg = parseCouponConfig(coupon);
+  if(!cfg || subtotal <= 0) return 0;
+  if(cfg.minSubtotal && subtotal < cfg.minSubtotal) return 0;
+
+  let discount = cfg.mode === "percent" ? subtotal * cfg.value / 100 : cfg.value;
+  if(cfg.maxDiscount > 0) discount = Math.min(discount, cfg.maxDiscount);
+  return Math.max(0, Math.min(subtotal, discount));
+}
+
+function couponLabel(coupon){
+  const cfg = parseCouponConfig(coupon);
+  if(!coupon || !cfg) return "";
+  if(cfg.label) return cfg.label;
+  return cfg.mode === "percent" ? `${cfg.value}% de desconto` : `${money(cfg.value)} de desconto`;
+}
+
+function renderPromos(store){
+  const area = $("#promoArea");
+  if(!area) return;
+
+  const banners = publicBanners(store).slice(0, 3);
+  const coupons = publicCoupons(store).slice(0, 6);
+  const html = [];
+
+  banners.forEach(banner => {
+    html.push(`<article class="promo-card"><span class="badge ok">Promoção</span><h3>${esc(banner.title || "Promoção")}</h3><p>${esc(banner.excerpt || banner.content || "")}</p></article>`);
+  });
+
+  if(coupons.length){
+    html.push(`<div class="coupon-strip">${coupons.map(coupon => `<button class="coupon-chip" type="button" data-use-coupon="${esc(coupon.slug || coupon.code || coupon.title || "")}">Cupom ${esc(coupon.slug || coupon.code || coupon.title || "")}</button>`).join("")}</div>`);
+  }
+
+  area.innerHTML = html.join("");
+
+  $$("[data-use-coupon]", area).forEach(btn => {
+    btn.onclick = () => {
+      state.couponCode = String(btn.dataset.useCoupon || "").trim();
+      localStorage.setItem("mf-coupon", state.couponCode);
+      renderCart();
+      $("#cartDrawer").classList.remove("hidden");
+      toast("Cupom selecionado.", "ok");
+    };
+  });
+}
 function show(view){
   ["homeView","featuresView","menuView"].forEach(id => $("#"+id).classList.add("hidden"));
   $("#"+view).classList.remove("hidden");
@@ -231,23 +325,69 @@ function addToCart(id, selectedFlavors=[]){
   saveCart(); renderCart(); toast(product.name + " adicionado.", "ok");
 }
 function cartTotals(){
-  const subtotal = state.cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const subtotal = state.cart.reduce((sum,item) => sum + Number(item.price || 0) * Number(item.qty || 0), 0);
+  const delivery = state.cart.length ? Number((state.activeStore || demoStore()).deliveryFee || 0) : 0;
   const coupon = findCoupon(state.couponCode);
   const discount = couponDiscount(coupon, subtotal);
-  const delivery = state.cart.length ? Number((state.activeStore || demoStore()).deliveryFee || 0) : 0;
-  return { subtotal, discount, delivery, total:Math.max(0, subtotal - discount) + delivery, coupon };
+  const total = Math.max(0, subtotal - discount) + delivery;
+
+  return {
+    subtotal,
+    delivery,
+    discount,
+    total,
+    coupon,
+    couponCode: coupon ? (coupon.slug || coupon.code || coupon.title || state.couponCode) : "",
+    couponLabel: coupon ? couponLabel(coupon) : "",
+    couponValid: !!coupon,
+    couponTyped: !!String(state.couponCode || "").trim()
+  };
 }
+
 function renderCart(){
-  $("#cartCount").textContent = state.cart.reduce((s,i)=>s+i.qty,0);
-  $("#cartItems").innerHTML = state.cart.map(i=>`<div class="cart-item"><div><strong>${esc(i.name)}</strong>${i.flavorText ? `<br><small>Sabores: ${esc(i.flavorText)}</small>` : ""}<br><small>${money(i.price)} un.</small></div><div class="qty"><button data-dec="${esc(i.cartId || i.id)}">−</button><b>${i.qty}</b><button data-inc="${esc(i.cartId || i.id)}">+</button></div></div>`).join("") || `<div class="empty">Carrinho vazio.</div>`;
-  $$("[data-inc]").forEach(b => b.onclick = () => qty(b.dataset.inc, 1));
-  $$("[data-dec]").forEach(b => b.onclick = () => qty(b.dataset.dec, -1));
-  const t = cartTotals();
-  $("#cartSubtotal").textContent = money(t.subtotal);
-  $("#cartDelivery").textContent = money(t.delivery);
-  if($("#cartDiscount")) $("#cartDiscount").textContent = "- " + money(t.discount || 0);
-  if($("#couponCode")) $("#couponCode").value = state.couponCode || "";
-  $("#cartTotal").textContent = money(t.total);
+  const totalQty = state.cart.reduce((sum,item) => sum + Number(item.qty || 0), 0);
+  $("#cartCount").textContent = totalQty;
+
+  $("#cartItems").innerHTML = state.cart.map(item => {
+    const itemKey = esc(item.cartId || item.id);
+    const flavor = item.flavorText ? `<br><small>Sabores: ${esc(item.flavorText)}</small>` : "";
+    return `<div class="cart-item"><div><strong>${esc(item.name)}</strong>${flavor}<br><small>${money(item.price)} un.</small></div><div class="qty"><button data-dec="${itemKey}" type="button">−</button><b>${esc(item.qty)}</b><button data-inc="${itemKey}" type="button">+</button></div></div>`;
+  }).join("") || `<div class="empty">Carrinho vazio.</div>`;
+
+  $$("[data-inc]").forEach(button => button.onclick = () => qty(button.dataset.inc, 1));
+  $$("[data-dec]").forEach(button => button.onclick = () => qty(button.dataset.dec, -1));
+
+  const totals = cartTotals();
+
+  $("#cartSubtotal").textContent = money(totals.subtotal);
+  $("#cartDelivery").textContent = money(totals.delivery);
+  $("#cartTotal").textContent = money(totals.total);
+
+  if($("#cartDiscount")){
+    $("#cartDiscount").textContent = totals.discount ? "- " + money(totals.discount) : money(0);
+  }
+
+  if($("#couponCode")){
+    $("#couponCode").value = state.couponCode || "";
+  }
+
+  if($("#couponStatus")){
+    $("#couponStatus").className = "coupon-status";
+
+    if(totals.couponTyped && totals.couponValid && totals.discount > 0){
+      $("#couponStatus").classList.add("ok");
+      $("#couponStatus").textContent = `Cupom ${totals.couponCode} aplicado: ${totals.couponLabel}.`;
+    }else if(totals.couponTyped && totals.couponValid && totals.discount <= 0){
+      const cfg = parseCouponConfig(totals.coupon);
+      $("#couponStatus").classList.add("err");
+      $("#couponStatus").textContent = cfg && cfg.minSubtotal ? `Cupom válido, mas exige subtotal mínimo de ${money(cfg.minSubtotal)}.` : "Cupom válido, mas sem desconto aplicável neste carrinho.";
+    }else if(totals.couponTyped && !totals.couponValid){
+      $("#couponStatus").classList.add("err");
+      $("#couponStatus").textContent = "Cupom não encontrado ou indisponível para esta loja.";
+    }else{
+      $("#couponStatus").textContent = "Digite um cupom publicado no ForgeCMS.";
+    }
+  }
 }
 function qty(id,delta){
   const item = state.cart.find(i=>(i.cartId || i.id)===id);
@@ -258,66 +398,195 @@ function qty(id,delta){
 }
 function address(order){ const a=order.address||{}; return [a.street,a.number,a.district,a.complement,a.reference].filter(Boolean).join(", "); }
 function wa(phone,msg){ const p=String(phone||"").replace(/\D/g,""); return "https://wa.me/"+p+"?text="+encodeURIComponent(msg); }
-async function submitOrder(form){
+async async function submitOrder(form){
   if(!state.cart.length) return toast("Carrinho vazio.", "err");
+
   const fd = new FormData(form);
   const store = state.activeStore || demoStore();
-  const t = cartTotals();
+  const totals = cartTotals();
+
   const order = {
     storeId: store.id,
     storeName: store.name,
-    items: state.cart,
-    subtotal: t.subtotal,
-    deliveryFee: t.delivery,
-    discount: t.discount || 0,
-    coupon: t.coupon ? { id:t.coupon.id, code:t.coupon.slug || t.coupon.title, title:t.coupon.title } : null,
-    total: t.total,
+    items: state.cart.map(item => ({
+      cartId: item.cartId || item.id,
+      id: item.id,
+      storeId: item.storeId,
+      name: item.name,
+      flavors: item.flavors || [],
+      flavorText: item.flavorText || "",
+      price: Number(item.price || 0),
+      basePrice: Number(item.basePrice || item.price || 0),
+      qty: Number(item.qty || 1)
+    })),
+    subtotal: totals.subtotal,
+    deliveryFee: totals.delivery,
+    discount: totals.discount,
+    total: totals.total,
+    coupon: totals.coupon ? {
+      id: totals.coupon.id,
+      code: totals.couponCode,
+      title: totals.coupon.title || "",
+      label: totals.couponLabel,
+      rawContent: totals.coupon.content || ""
+    } : null,
     status: "new",
     shortId: Math.random().toString(36).slice(2,8).toUpperCase(),
-    customer: { name:fd.get("name"), phone:fd.get("phone") },
-    address: { street:fd.get("street"), number:fd.get("number"), district:fd.get("district"), complement:fd.get("complement"), reference:fd.get("reference") },
-    payment: { method:fd.get("payment"), changeFor:fd.get("changeFor") },
+    customer: {
+      name: fd.get("name"),
+      phone: fd.get("phone")
+    },
+    address: {
+      street: fd.get("street"),
+      number: fd.get("number"),
+      district: fd.get("district"),
+      complement: fd.get("complement"),
+      reference: fd.get("reference")
+    },
+    payment: {
+      method: fd.get("payment"),
+      changeFor: fd.get("changeFor")
+    },
     notes: fd.get("notes"),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  try{
-    if(store.id !== "demo") await addDoc(collection(db,"orders"), order);
-    state.cart = []; saveCart(); renderCart();
-    $("#checkoutDialog").close(); $("#cartDrawer").classList.add("hidden");
-    if(store.whatsapp) window.open(wa(store.whatsapp, `Novo pedido #${order.shortId}\nTotal: ${money(order.total)}${order.discount ? "\nDesconto: -" + money(order.discount) : ""}${order.coupon ? "\nCupom: " + order.coupon.code : ""}\nCliente: ${order.customer.name}\nEndereço: ${address(order)}\nItens: ${order.items.map(i => `${i.qty}x ${i.name}${i.flavorText ? " ("+i.flavorText+")" : ""}`).join(", ")}`), "_blank", "noopener,noreferrer");
-    toast("Pedido criado.", "ok");
-  }catch(err){ toast("Erro ao criar pedido: " + err.message, "err"); }
-}
 
+  const lines = [
+    `Novo pedido #${order.shortId}`,
+    `Subtotal: ${money(order.subtotal)}`,
+    order.discount ? `Desconto: -${money(order.discount)}` : "",
+    order.coupon ? `Cupom: ${order.coupon.code} (${order.coupon.label})` : "",
+    `Entrega: ${money(order.deliveryFee)}`,
+    `Total: ${money(order.total)}`,
+    `Cliente: ${order.customer.name}`,
+    `WhatsApp: ${order.customer.phone}`,
+    `Endereço: ${address(order)}`,
+    `Pagamento: ${order.payment.method}${order.payment.changeFor ? " · Troco para " + order.payment.changeFor : ""}`,
+    order.notes ? `Obs: ${order.notes}` : "",
+    `Itens: ${order.items.map(item => `${item.qty}x ${item.name}${item.flavorText ? " (" + item.flavorText + ")" : ""}`).join(", ")}`
+  ].filter(Boolean);
+
+  try{
+    if(store.id !== "demo"){
+      await addDoc(collection(db,"orders"), order);
+    }
+
+    state.cart = [];
+    state.couponCode = "";
+    localStorage.removeItem("mf-coupon");
+    saveCart();
+    renderCart();
+
+    $("#checkoutDialog").close();
+    $("#cartDrawer").classList.add("hidden");
+
+    if(store.whatsapp){
+      window.open(wa(store.whatsapp, lines.join("\n")), "_blank", "noopener,noreferrer");
+    }
+
+    toast("Pedido criado.", "ok");
+  }catch(err){
+    toast("Erro ao criar pedido: " + err.message, "err");
+  }
+}
 function bind(){
-  // checkout-close-force-1
-  $("#menuSearch").oninput = e => { state.menuSearch = e.target.value; renderMenu(); };
+  $("#menuSearch").oninput = event => {
+    state.menuSearch = event.target.value;
+    renderMenu();
+  };
+
   $("#openCart").onclick = () => $("#cartDrawer").classList.remove("hidden");
   $("#closeCart").onclick = () => $("#cartDrawer").classList.add("hidden");
   $("#checkoutButton").onclick = () => state.cart.length ? $("#checkoutDialog").showModal() : toast("Carrinho vazio.", "err");
-  $$("#checkoutDialog [data-close-checkout], #checkoutDialog button[value='cancel'], #checkoutDialog .close").forEach(btn => btn.onclick = e => {
-    e.preventDefault();
-    $("#checkoutDialog").close();
+
+  $$("#checkoutDialog [data-close-checkout], #checkoutDialog button[value='cancel'], #checkoutDialog .close").forEach(button => {
+    button.onclick = event => {
+      event.preventDefault();
+      $("#checkoutDialog").close();
+    };
   });
-  $("#checkoutDialog").addEventListener("click", e => {
-    if(e.target === $("#checkoutDialog")) $("#checkoutDialog").close();
+
+  $("#checkoutDialog").addEventListener("click", event => {
+    if(event.target === $("#checkoutDialog")){
+      $("#checkoutDialog").close();
+    }
   });
-  if($("#applyCoupon")) $("#applyCoupon").onclick = () => {
-    state.couponCode = ($("#couponCode").value || "").trim();
-    localStorage.setItem("mf-coupon", state.couponCode);
-    const c = findCoupon(state.couponCode);
-    renderCart();
-    toast(c ? "Cupom aplicado." : "Cupom não encontrado.", c ? "ok" : "err");
+
+  if($("#applyCoupon")){
+    $("#applyCoupon").onclick = () => {
+      const typed = ($("#couponCode").value || "").trim();
+
+      if(!typed){
+        state.couponCode = "";
+        localStorage.removeItem("mf-coupon");
+        renderCart();
+        toast("Cupom removido.", "ok");
+        return;
+      }
+
+      const coupon = findCoupon(typed);
+
+      if(!coupon){
+        state.couponCode = typed;
+        localStorage.setItem("mf-coupon", state.couponCode);
+        renderCart();
+        toast("Cupom não encontrado.", "err");
+        return;
+      }
+
+      state.couponCode = coupon.slug || coupon.code || coupon.title || typed;
+      localStorage.setItem("mf-coupon", state.couponCode);
+      renderCart();
+      toast("Cupom aplicado.", "ok");
+    };
+  }
+
+  if($("#clearCoupon")){
+    $("#clearCoupon").onclick = () => {
+      state.couponCode = "";
+      localStorage.removeItem("mf-coupon");
+      renderCart();
+      toast("Cupom limpo.", "ok");
+    };
+  }
+
+  $("#checkoutForm").onsubmit = event => {
+    if(event.submitter?.value === "cancel") return;
+    event.preventDefault();
+    submitOrder(event.currentTarget);
   };
-  $("#checkoutForm").onsubmit = e => { if(e.submitter?.value === "cancel") return; e.preventDefault(); submitOrder(e.currentTarget); };
+
   window.addEventListener("hashchange", route);
 }
 function subscribe(){
-  onSnapshot(collection(db,"stores"), snap => { state.stores=snap.docs.map(d=>({id:d.id,...d.data()})); state.storesLoaded=true; route(); }, err => { state.storesLoaded=true; toast("Erro ao carregar lojas: " + err.message, "err"); route(); });
-  onSnapshot(collection(db,"categories"), snap => { state.categories=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); }, err => toast("Erro ao carregar categorias: " + err.message, "err"));
-  onSnapshot(collection(db,"products"), snap => { state.products=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); }, err => toast("Erro ao carregar produtos: " + err.message, "err"));
-  onSnapshot(collection(db,"cms_content"), snap => { state.content=snap.docs.map(d=>({id:d.id,...d.data()})); renderMenu(); renderCart(); }, err => toast("Erro ao carregar conteúdo: " + err.message, "err"));
+  onSnapshot(collection(db,"stores"), snap => {
+    state.stores = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    state.storesLoaded = true;
+    route();
+  }, err => {
+    state.storesLoaded = true;
+    toast("Erro ao carregar lojas: " + err.message, "err");
+    route();
+  });
+
+  onSnapshot(collection(db,"categories"), snap => {
+    state.categories = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderMenu();
+  }, err => toast("Erro ao carregar categorias: " + err.message, "err"));
+
+  onSnapshot(collection(db,"products"), snap => {
+    state.products = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderMenu();
+  }, err => toast("Erro ao carregar produtos: " + err.message, "err"));
+
+  const publishedContentQuery = query(collection(db,"cms_content"), where("status","==","published"));
+
+  onSnapshot(publishedContentQuery, snap => {
+    state.content = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderMenu();
+    renderCart();
+  }, err => toast("Erro ao carregar banners e cupons: " + err.message, "err"));
 }
 bind();
 subscribe();

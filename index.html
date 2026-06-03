@@ -102,7 +102,8 @@
     <footer>
       <p><span>Subtotal</span><strong id="cartSubtotal">R$ 0,00</strong></p>
       <p><span>Entrega</span><strong id="cartDelivery">R$ 0,00</strong></p>
-      <div class="coupon-box"><input id="couponCode" placeholder="Cupom" autocomplete="off"><button id="applyCoupon" class="btn soft" type="button">Aplicar</button></div>
+      <div class="coupon-box"><input id="couponCode" placeholder="Cupom" autocomplete="off"><button id="applyCoupon" class="btn soft" type="button">Aplicar</button><button id="clearCoupon" class="btn ghost" type="button">Limpar</button></div>
+      <p id="couponStatus" class="coupon-status">Digite um cupom publicado no ForgeCMS.</p>
       <p><span>Desconto</span><strong id="cartDiscount">R$ 0,00</strong></p>
       <p class="cart-total"><span>Total</span><strong id="cartTotal">R$ 0,00</strong></p>
       <button id="checkoutButton" class="btn primary full" type="button">Finalizar pedido</button>
@@ -128,7 +129,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="./src/public.js?v=public-cms1"></script>
+  <script type="module" src="./src/public.js?v=phase3-cms"></script>
 </body>
 </html>
 
